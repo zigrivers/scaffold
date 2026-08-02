@@ -3,8 +3,12 @@ import { StateManager } from '../../src/state/state-manager.js'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-import { BUDGET_STATE_READ_MS, BUDGET_STATE_WRITE_MS } from './budgets.js'
-import { p95PerOpMs } from './measure.js'
+import {
+  BUDGET_STATE_READ_MS,
+  BUDGET_STATE_WRITE_MEDIAN_MS,
+  BUDGET_STATE_WRITE_MAX_MS,
+} from './budgets.js'
+import { perOpStatsMs } from './measure.js'
 
 describe('State I/O Performance', () => {
   let tmpDir: string
@@ -33,19 +37,28 @@ describe('State I/O Performance', () => {
     // pass a timing budget. Prove the read is real before timing it.
     expect(Object.keys(stateManager.loadState().steps)).toHaveLength(36)
 
-    const p95 = p95PerOpMs(() => { stateManager.loadState() })
-    console.log(`State read p95=${p95.toFixed(4)}ms/op`)
-    expect(p95).toBeLessThan(BUDGET_STATE_READ_MS)
+    const stats = perOpStatsMs(() => { stateManager.loadState() })
+    console.log(`State read ${stats.summary}`)
+    expect(stats.p95).toBeLessThan(BUDGET_STATE_READ_MS)
   })
 
-  it('writes state within budget (p95)', () => {
+  // The MEDIAN, not the p95 — the only benchmark here that does this, and
+  // budgets.ts carries the measurements that forced it: across five CI runs of
+  // identical code this p95 spanned 29x (0.179 to 5.158ms/op) because the write
+  // is fsync-bound on a shared runner disk. The full distribution is still
+  // logged, so a real regression is visible in the line even though only the
+  // median is asserted.
+  it('writes state within budget (median)', () => {
     const state = stateManager.loadState()
 
     stateManager.saveState({ ...state })
     expect(fs.existsSync(path.join(tmpDir, '.scaffold', 'state.json'))).toBe(true)
 
-    const p95 = p95PerOpMs(() => { stateManager.saveState({ ...state }) })
-    console.log(`State write p95=${p95.toFixed(4)}ms/op`)
-    expect(p95).toBeLessThan(BUDGET_STATE_WRITE_MS)
+    const stats = perOpStatsMs(() => { stateManager.saveState({ ...state }) })
+    console.log(`State write ${stats.summary}`)
+    expect(stats.median).toBeLessThan(BUDGET_STATE_WRITE_MEDIAN_MS)
+    // Plus a deliberately loose floor under the tail, so dropping the p95
+    // assertion does not mean nothing watches it at all. See budgets.ts.
+    expect(stats.max).toBeLessThan(BUDGET_STATE_WRITE_MAX_MS)
   })
 })

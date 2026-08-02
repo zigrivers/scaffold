@@ -4,7 +4,7 @@ import type { AssemblyOptions } from '../../src/types/index.js'
 import type { MetaPromptFile } from '../../src/types/index.js'
 import type { PipelineState } from '../../src/types/state.js'
 import { BUDGET_ASSEMBLY_MS, BUDGET_ASSEMBLY_HEAVY_MS } from './budgets.js'
-import { p95PerOpMs } from './measure.js'
+import { perOpStatsMs } from './measure.js'
 
 // Create a realistic mock of assembly inputs
 function createRealisticOptions(): { step: string; options: AssemblyOptions } {
@@ -116,11 +116,11 @@ describe('Assembly Engine Performance', () => {
     // timing budget.
     expect(engine.assemble(step, options).success).toBe(true)
 
-    const p95 = p95PerOpMs(() => { engine.assemble(step, options) })
-    console.log(`Assembly p95=${p95.toFixed(4)}ms/op`)
+    const stats = perOpStatsMs(() => { engine.assemble(step, options) })
+    console.log(`Assembly ${stats.summary}`)
 
     // budgets.ts explains why this is not the PRD's original 500ms.
-    expect(p95).toBeLessThan(BUDGET_ASSEMBLY_MS)
+    expect(stats.p95).toBeLessThan(BUDGET_ASSEMBLY_MS)
   })
 
   it('assembles a knowledge-heavy prompt within budget (p95)', () => {
@@ -135,9 +135,9 @@ describe('Assembly Engine Performance', () => {
     expect(result.prompt!.text.length, 'heavy fixture did not produce a large prompt')
       .toBeGreaterThan(15_000)
 
-    const p95 = p95PerOpMs(() => { engine.assemble(step, options) })
-    console.log(`Assembly (heavy) p95=${p95.toFixed(4)}ms/op`)
-    expect(p95).toBeLessThan(BUDGET_ASSEMBLY_HEAVY_MS)
+    const stats = perOpStatsMs(() => { engine.assemble(step, options) })
+    console.log(`Assembly (heavy) ${stats.summary}`)
+    expect(stats.p95).toBeLessThan(BUDGET_ASSEMBLY_HEAVY_MS)
   })
 
   it('produces deterministic output', () => {
