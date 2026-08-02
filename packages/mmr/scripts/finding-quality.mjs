@@ -2066,7 +2066,7 @@ function evaluateVerdict(base, cand, opts = {}) {
   // reached. A blocker makes `report` print NO VERDICT and say why.
   if (perm.exact === false) {
     blockers.push(`the permutation test needs ${perm.splits.toLocaleString()} splits, above the `
-      + `${PERMUTATION_EXACT_LIMIT.toLocaleString()} this enumerates — no verdict can be issued `
+      + `${PERMUTATION_EXACT_LIMIT.toLocaleString()} split limit — no verdict can be issued `
       + 'rather than an approximated one. Compare fewer runs per arm.')
   }
   // Named for the rubric's own vocabulary — it prints "inside the noise band" —
@@ -2380,12 +2380,12 @@ function report(args) {
     + `${v.countDown ? 'down' : 'NOT down — the rate fell only because the denominator grew'}`)
   console.log(`low-value count:   ${base.lowValues} → ${cand.lowValues}  `
     + `${v.lowValueDown ? 'down' : 'NOT down — speculative findings were traded for other low-value ones'}`)
-  console.log(`improvement ${pct(v.improvement)} — permutation p=${v.perm.p.toFixed(3)}`
-    + (v.perm.exact
-      ? ` over ${v.perm.splits.toLocaleString()} splits (alpha ${PERMUTATION_ALPHA}) — `
-        + `${v.outsideBand ? 'distinguishable from relabelling' : 'INSIDE the noise band'}`
-      : ` — NOT TESTED: ${v.perm.splits.toLocaleString()} splits exceeds what is `
-        + 'enumerated, so no verdict is issued rather than an approximation'))
+  // No `exact === false` branch here: that case pushes a blocker, and report
+  // returns at the blocker check above, so this line only ever runs on a test
+  // that was actually enumerated.
+  console.log(`improvement ${pct(v.improvement)} — permutation p=${v.perm.p.toFixed(3)} over `
+    + `${v.perm.splits.toLocaleString()} splits (alpha ${PERMUTATION_ALPHA}) — `
+    + `${v.outsideBand ? 'distinguishable from relabelling' : 'INSIDE the noise band'}`)
   console.log(`defect count:     ${base.defects} → ${cand.defects}  ${defectVerdict}`)
   console.log(`baseline defects per run: ${range(base.defectsPerRun)} `
     + `(candidate is ${dropPerRun >= 0 ? '-' : '+'}${Math.abs(dropPerRun).toFixed(2)} per run)`)
