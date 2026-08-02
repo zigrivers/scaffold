@@ -1954,8 +1954,11 @@ function meanOf(xs) {
  * the same seeded shuffle used for blinding — never Math.random, which is
  * unavailable here by design and would make a verdict unreproducible.
  *
- * Returns { p, splits, exact }. `p` is 1 for degenerate input (an empty arm, or
- * arms of unequal length), which fails the rule closed.
+ * Returns { p, pBound, splits, exact }. `p` is the estimate; `pBound` is what
+ * callers must gate on — equal to `p` under exhaustive enumeration, and the
+ * upper end of a Wilson interval when sampling forced an approximation, so a
+ * borderline sampled result fails closed. Both are 1 for degenerate input (an
+ * empty arm, or arms of unequal length), which fails the rule closed.
  */
 function permutationTest(baseRates, candRates) {
   const n = baseRates.length
