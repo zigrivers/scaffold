@@ -255,9 +255,17 @@ observed baseline-vs-baseline spread is not a result.
   which compares pooled mean against pooled mean.
 
   Per this file's own amendment procedure, every condition was re-scored from
-  scratch, not one arm. **The new rule changes no verdict.** #808 stage presets:
-  p = 0.561. #807 target 2: p = 1.000. Both remain `revert`, and conditions 2,
-  3, 5 and 6 remain the deciding ones. #807 target 1 can no longer be re-scored
+  scratch, not one arm — the harness enforces this with a rubric digest and
+  refuses to report against scores produced under an earlier version. **The new
+  rule changes no verdict.** #808 stage presets: p = 0.500. #807 target 2:
+  p = 1.000. Both remain `revert`, and conditions 2, 3, 5 and 6 remain the
+  deciding ones.
+
+  The re-scoring pass also demonstrated the judge variance this file warns
+  about: with identical findings and an unchanged classification section, #808's
+  speculative count came back 2 rather than 3 and #807 target 2's defect count
+  20 rather than 19. The verdicts did not move, but the individual counts did —
+  another reason no single number should decide a ship. #807 target 1 can no longer be re-scored
   at all — a later provenance guard requires build-treatment arms to record
   their `dist`, `templates` and manifest digests, and that collection predates
   those fields. Its numbers stand as descriptive only.

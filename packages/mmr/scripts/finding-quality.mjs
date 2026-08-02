@@ -1986,7 +1986,10 @@ function permutationTest(baseRates, candRates) {
       idx[i]++
       for (let j = i + 1; j < n; j++) idx[j] = idx[j - 1] + 1
     }
-    return { p: hits / splits, splits, exact: true }
+    // Exhaustive: the observed labelling is itself one of the splits and always
+    // counts as a hit, so p >= 1/splits by construction and cannot reach 0.
+    const p = hits / splits
+    return { p, pBound: p, splits, exact: true }
   }
   // Deterministic sample. Seeded from the data itself, so the same input always
   // yields the same p and two different experiments do not share a permutation
@@ -2000,7 +2003,19 @@ function permutationTest(baseRates, candRates) {
     if (diffFromSum(sumA) >= threshold - BAND_EPSILON) hits++
     splits++
   }
-  return { p: hits / splits, splits, exact: false }
+  // (hits + 1) / (splits + 1), not hits / splits.
+  //
+  // Two reasons, one fix. The exhaustive branch always includes the observed
+  // labelling among its splits, so its p can never be 0; a sample that happens
+  // to miss it would report p = 0 and claim certainty it does not have. And a
+  // sampled proportion is an ESTIMATE — treating it as exact lets Monte Carlo
+  // error carry a true p above alpha to an estimate below it.
+  const p = (hits + 1) / (splits + 1)
+  // Gate on the upper end of the estimate, not its midpoint: two standard
+  // errors of the sampling distribution, so a borderline case fails closed. The
+  // exhaustive branch needs no such margin, which is why pBound equals p there.
+  const se = Math.sqrt((p * (1 - p)) / splits)
+  return { p, pBound: p + 2 * se, splits, exact: false }
 }
 
 function evaluateVerdict(base, cand, opts = {}) {
@@ -2053,9 +2068,15 @@ function evaluateVerdict(base, cand, opts = {}) {
   // nowhere near normal.
   const improvement = base.speculativeRate - cand.speculativeRate
   const perm = permutationTest(base.specRates, cand.specRates)
-  const outsideBand = perm.p < PERMUTATION_ALPHA
-  // No longer subsumed: the test is two-sided in construction and a tiny drop
-  // can be significant, so the direction has to be checked on its own.
+  // pBound, not p: identical under exhaustive enumeration, and two standard
+  // errors above the estimate when the split count forced sampling, so a
+  // borderline sampled result fails closed.
+  const outsideBand = perm.pBound < PERMUTATION_ALPHA
+  // The test is ONE-sided in the direction of improvement, so a significant p
+  // already implies the pooled rate fell — specDown is subsumed, exactly as the
+  // old margin comparison subsumed it. Kept because the rubric states the two
+  // as separate conditions and the report prints them separately; it is not an
+  // independent check.
   const specDown = cand.speculativeRate < base.speculativeRate
   // The RATE alone is gameable: adding defects, hygiene findings or artifacts
   // enlarges the denominator and lowers speculative_rate while the number of
@@ -2358,8 +2379,9 @@ function report(args) {
     + `${v.countDown ? 'down' : 'NOT down — the rate fell only because the denominator grew'}`)
   console.log(`low-value count:   ${base.lowValues} → ${cand.lowValues}  `
     + `${v.lowValueDown ? 'down' : 'NOT down — speculative findings were traded for other low-value ones'}`)
-  console.log(`improvement ${pct(v.improvement)} — permutation p=${v.perm.p.toFixed(3)} over `
-    + `${v.perm.splits.toLocaleString()} ${v.perm.exact ? 'exact splits' : 'sampled splits'} `
+  console.log(`improvement ${pct(v.improvement)} — permutation p=${v.perm.p.toFixed(3)}`
+    + (v.perm.exact ? '' : ` (sampled; gated on p+2se=${v.perm.pBound.toFixed(3)})`)
+    + ` over ${v.perm.splits.toLocaleString()} ${v.perm.exact ? 'exact' : 'sampled'} splits `
     + `(alpha ${PERMUTATION_ALPHA}) — `
     + `${v.outsideBand ? 'distinguishable from relabelling' : 'INSIDE the noise band'}`)
   console.log(`defect count:     ${base.defects} → ${cand.defects}  ${defectVerdict}`)
@@ -2666,9 +2688,32 @@ function selftest() {
       specRates: [0, 0, 0, 0, 0, 0], speculativeRate: 0, speculatives: 0, lowValues: 6,
     }),
   )
-  assert.ok(realShape.perm.p > 0 && realShape.perm.p <= 1, 'a p-value must be produced at all')
   assert.equal(realShape.perm.exact, true, 'N=6 must be decided exhaustively')
   assert.equal(realShape.perm.splits, 924, 'C(12,6) = 924 splits at the rubric floor')
+  // Pinned, not merely bounded: exhaustive enumeration makes this deterministic,
+  // and the rubric and PR both quote 0.227 as the evidence that N=6 cannot
+  // resolve a rate difference this size. If the number moves, the documentation
+  // is wrong and this must fail.
+  assert.equal(realShape.perm.p.toFixed(3), '0.227', 'the documented p-value must hold')
+  assert.equal(realShape.perm.pBound, realShape.perm.p, 'exhaustive mode needs no sampling margin')
+  assert.equal(realShape.ship, false, 'six runs at this separation cannot ship')
+
+  // Exhaustive enumeration always includes the observed labelling, so p can
+  // never be zero — a rule that could return p=0 would claim certainty it has
+  // not earned.
+  assert.ok(permutationTest([1, 1, 1], [0, 0, 0]).p >= 1 / 20,
+    'the observed split must always count as a hit')
+
+  // Sampled mode: N=11 puts C(22,11) at 705,432, past the exhaustive limit.
+  const big = (v) => Array.from({ length: 11 }, (_, i) => v + (i % 2) * 0.01)
+  const sampled = permutationTest(big(0.5), big(0.1))
+  assert.equal(sampled.exact, false, 'past the limit the test must sample')
+  assert.ok(sampled.p > 0, 'the add-one estimator keeps a sampled p above zero')
+  assert.ok(sampled.pBound > sampled.p, 'a sampled result must carry a margin')
+  // Deterministic: seeded from the data, so the same input repeats exactly.
+  assert.deepEqual(permutationTest(big(0.5), big(0.1)), sampled, 'sampling must be reproducible')
+  // And it still separates an obvious difference.
+  assert.ok(sampled.pBound < PERMUTATION_ALPHA, 'clean separation must survive sampling')
 
   // Clear separation is significant; overlap is not.
   const sixBase = { specRates: [0.4, 0.5, 0.4, 0.5, 0.4, 0.5], speculativeRate: 0.45 }
