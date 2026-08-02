@@ -74,7 +74,7 @@ export function perOpStatsMs(
   if (above < MIN_SAMPLES_ABOVE_P95) {
     throw new Error(
       `perOpStatsMs: ${samples} samples puts the p95 rank ${above} sample(s) from the top, `
-      + `so it reports a maximum rather than a p95. Use at least `
+      + 'so it reports a maximum rather than a p95. Use at least '
       + `${Math.ceil((MIN_SAMPLES_ABOVE_P95 + 1) / 0.05)} samples.`,
     )
   }
