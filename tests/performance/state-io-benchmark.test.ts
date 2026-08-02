@@ -3,7 +3,7 @@ import { StateManager } from '../../src/state/state-manager.js'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-import { BUDGET_STATE_READ_MS, BUDGET_STATE_WRITE_MS } from './budgets.js'
+import { BUDGET_STATE_READ_MS, BUDGET_STATE_WRITE_MEDIAN_MS } from './budgets.js'
 import { perOpStatsMs } from './measure.js'
 
 describe('State I/O Performance', () => {
@@ -38,7 +38,13 @@ describe('State I/O Performance', () => {
     expect(stats.p95).toBeLessThan(BUDGET_STATE_READ_MS)
   })
 
-  it('writes state within budget (p95)', () => {
+  // The MEDIAN, not the p95 — the only benchmark here that does this, and
+  // budgets.ts carries the measurements that forced it: across five CI runs of
+  // identical code this p95 spanned 29x (0.179 to 5.158ms/op) because the write
+  // is fsync-bound on a shared runner disk. The full distribution is still
+  // logged, so a real regression is visible in the line even though only the
+  // median is asserted.
+  it('writes state within budget (median)', () => {
     const state = stateManager.loadState()
 
     stateManager.saveState({ ...state })
@@ -46,6 +52,6 @@ describe('State I/O Performance', () => {
 
     const stats = perOpStatsMs(() => { stateManager.saveState({ ...state }) })
     console.log(`State write ${stats.summary}`)
-    expect(stats.p95).toBeLessThan(BUDGET_STATE_WRITE_MS)
+    expect(stats.median).toBeLessThan(BUDGET_STATE_WRITE_MEDIAN_MS)
   })
 })
