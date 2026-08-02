@@ -1959,7 +1959,10 @@ function meanOf(xs) {
  */
 function permutationTest(baseRates, candRates) {
   const n = baseRates.length
-  if (n === 0 || candRates.length !== n) return { p: 1, splits: 0, exact: true }
+  // pBound is set here too. Callers gate on it, and an undefined would compare
+  // false against alpha — failing closed by accident rather than by design,
+  // which is the kind of correctness that quietly stops being true.
+  if (n === 0 || candRates.length !== n) return { p: 1, pBound: 1, splits: 0, exact: true }
   const pool = [...baseRates, ...candRates]
   const observed = meanOf(baseRates) - meanOf(candRates)
   const total = choose(pool.length, n)
@@ -2011,11 +2014,24 @@ function permutationTest(baseRates, candRates) {
   // sampled proportion is an ESTIMATE — treating it as exact lets Monte Carlo
   // error carry a true p above alpha to an estimate below it.
   const p = (hits + 1) / (splits + 1)
-  // Gate on the upper end of the estimate, not its midpoint: two standard
-  // errors of the sampling distribution, so a borderline case fails closed. The
-  // exhaustive branch needs no such margin, which is why pBound equals p there.
-  const se = Math.sqrt((p * (1 - p)) / splits)
-  return { p, pBound: p + 2 * se, splits, exact: false }
+  // Gate on the upper end of a confidence interval, not the point estimate, so
+  // a borderline sampled result fails closed.
+  //
+  // Wilson rather than p + 2·SE: the Wald interval it replaces is a normal
+  // approximation that misbehaves exactly where this is used — small p, near
+  // the alpha boundary — and can sit BELOW the true value, which is the wrong
+  // direction for a ship rule. Wilson is closed-form, needs no incomplete beta,
+  // and stays well behaved near zero.
+  //
+  // It is still a confidence bound, not a certainty: sampling cannot produce
+  // the exact p that exhaustive enumeration does. That is the price of a split
+  // count too large to enumerate, and the report says when it was paid.
+  const z = 2
+  const z2 = z * z
+  const denom = 1 + z2 / splits
+  const centre = (p + z2 / (2 * splits)) / denom
+  const half = (z * Math.sqrt((p * (1 - p)) / splits + z2 / (4 * splits * splits))) / denom
+  return { p, pBound: Math.min(1, centre + half), splits, exact: false }
 }
 
 function evaluateVerdict(base, cand, opts = {}) {
@@ -2668,15 +2684,32 @@ function selftest() {
     }
   }
 
+  // These two isolate the COUNT guards, so the per-run rates must separate
+  // cleanly — otherwise the permutation check blocks the ship on its own and
+  // the assertion passes whether or not the guard under test still works.
+  const separated = { specRates: Array(6).fill(0.1), speculativeRate: 0.1 }
+  // Sanity: with both counts falling, this fixture DOES ship. Without it the
+  // two assertions below would prove nothing.
+  assert.equal(evaluateVerdict(cond(), cond({ ...separated, speculatives: 5, lowValues: 6 })).ship,
+    true, 'the isolating fixture must otherwise ship')
   // A rate that fell only because the denominator grew must not ship.
-  assert.equal(evaluateVerdict(cond(), cond({ speculativeRate: 0.1, speculatives: 9, lowValues: 6 })).ship, false,
-    'the speculative COUNT must fall, not just the rate')
+  assert.equal(evaluateVerdict(cond(), cond({ ...separated, speculatives: 9, lowValues: 6 })).ship,
+    false, 'the speculative COUNT must fall, not just the rate')
   // Trading speculative findings for artifacts is not an improvement.
-  assert.equal(evaluateVerdict(cond(), cond({ speculativeRate: 0.1, speculatives: 5, lowValues: 12 })).ship, false,
-    'the low-value COUNT must fall too')
+  assert.equal(evaluateVerdict(cond(), cond({ ...separated, speculatives: 5, lowValues: 12 })).ship,
+    false, 'the low-value COUNT must fall too')
 
   // THE BUG THE OLD RULE HAD. Baseline pooled rate 8% with a per-run spread of
-  // 25% — the shape #807 target 1 actually produced. Under the old
+  // 25% — the shape #807 target 1 actually produced.
+  //
+  // The pooled rate (0.08) is deliberately NOT the mean of the per-run rates
+  // (0.075). Pooled is total speculative over total findings; the mean of
+  // per-run ratios weights a 1-finding run as heavily as a 6-finding one. Both
+  // are real quantities and the harness uses each where it belongs — pooled for
+  // the reported rate, per-run for the permutation test — so a fixture where
+  // they coincide would not be representative of any real collection.
+  //
+  // Under the old
   // width-based margin the largest achievable improvement (8pt, candidate at a
   // perfect zero) was below the 25pt margin, so nothing could EVER ship. The
   // test must now reach a verdict on the evidence instead of refusing by
