@@ -40,6 +40,21 @@
  *     --out runs/calibrated --pr 782 --n 6 --channels claude,codex,opencode-glm \
  *     --config ./candidate.mmr.yaml
  *
+ *   # A treatment the candidate config CANNOT carry — a prompt template, since
+ *   # a candidate .mmr.yaml may set only version/review_criteria/stage — is
+ *   # delivered as a second BUILD. --baseline-mmr points the baseline arm at it;
+ *   # the candidate arm stays on this build. `report` then requires mmrDigest and
+ *   # basePromptDigest to DIFFER, and every other provenance field to match.
+ *   node scripts/finding-quality.mjs collect \
+ *     --out runs/baseline --paired runs/candidate \
+ *     --baseline-mmr ../.mmr-pre-change/dist/index.js \
+ *     --pr 796 --n 6 --channels codex,opencode-glm
+ *
+ *   # --timeout bounds every channel, identically in both arms. A channel that
+ *   # times out contributes no findings and the rubric invalidates the whole
+ *   # condition, so on a slow model the default silently caps what is
+ *   # measurable. Set it from a measured run, not a guess.
+ *
  *   # 2. score — pools both arms, shuffles, judges blind to condition.
  *   #    Roles are explicit: the direction of the comparison must never depend
  *   #    on argument order.
@@ -118,8 +133,15 @@ function sha256(text) {
  * pulls in and in the prompt templates, so hashing it alone would call two
  * materially different builds identical.
  */
-function buildDigest() {
-  const roots = [path.resolve(HERE, '../dist'), path.resolve(HERE, '../templates')]
+function buildDigest(pkgRoot = path.resolve(HERE, '..'), subdirs = ['dist', 'templates']) {
+  // Deliberately NOT memoized, though it is called three times per arm and
+  // again before every run. A cache keyed on directory mtime would be wrong:
+  // rewriting a nested file does not change its parent directory's mtime, so a
+  // rebuild mid-collection would hit a stale entry and
+  // assertEnvironmentUnchanged -- the guard whose whole job is catching that --
+  // would pass. Re-walking a small dist/ costs nothing against a collection
+  // spent waiting on model calls, and the guard has to be exact.
+  const roots = subdirs.map((s) => path.join(pkgRoot, s))
   const parts = []
   const walk = (dir) => {
     if (!fs.existsSync(dir)) return
@@ -127,12 +149,93 @@ function buildDigest() {
       const full = path.join(dir, entry.name)
       if (entry.isDirectory()) walk(full)
       else if (/\.(js|mjs|cjs|md|json)$/.test(entry.name)) {
-        parts.push(`${path.relative(path.resolve(HERE, '..'), full)}:${sha256(fs.readFileSync(full, 'utf-8'))}`)
+        parts.push(`${path.relative(pkgRoot, full)}:${sha256(fs.readFileSync(full, 'utf-8'))}`)
       }
     }
   }
   for (const r of roots) walk(r)
   return sha256(parts.join('\n'))
+}
+
+/**
+ * The package root that owns an `mmr` entry point, i.e. the directory whose
+ * `dist/` and `templates/` that build actually reads. Paths are resolved from
+ * `dist/index.js` upward, which is the only layout `collect` ever points at.
+ */
+function pkgRootOf(mmrEntry) {
+  return path.resolve(path.dirname(mmrEntry), '..')
+}
+
+/**
+ * Not null ("inherits defaults") and not a number. Declared before its only
+ * user so the reference does not rely on the const being hoisted into scope by
+ * the time a later call runs.
+ */
+const UNKNOWN_TIMEOUT = 'unknown'
+
+/**
+ * A channel's OWN timeout, or null when it inherits `defaults.timeout`.
+ *
+ * `mmr review --timeout` overrides `defaults.timeout` only — a channel that
+ * sets its own keeps it, silently, because dispatch resolves
+ * `chConfig.timeout ?? config.defaults.timeout`. Measured: with `--timeout 5`,
+ * codex (inherits) timed out at 5s while opencode (owns `timeout: 300`) ran
+ * 241.9s to completion.
+ *
+ * `mmr config show <channel>` prints a top-level `timeout:` line ONLY for a
+ * channel that carries its own, which is exactly the distinction needed.
+ */
+function channelLevelTimeout(channel) {
+  const neutral = fs.mkdtempSync(path.join(os.tmpdir(), 'fq-ch-'))
+  try {
+    const out = execFileSync('node', [MMR, 'config', 'show', channel], {
+      encoding: 'utf-8', maxBuffer: 4 * 1024 * 1024, cwd: neutral,
+    })
+    // The WHOLE value, not its leading digits. `\d+` read `900.5` as 900 and
+    // failed to match a negative at all — and a failed match means "inherits
+    // defaults", so an unparseable timeout would have reported the channel as
+    // bound when nothing had been verified. Anything not a positive finite
+    // number is UNKNOWN, which blocks.
+    const m = out.match(/^timeout:\s*(\S+)/m)
+    if (m === null) return null
+    const n = Number(m[1])
+    return Number.isFinite(n) && n > 0 ? n : UNKNOWN_TIMEOUT
+  } catch {
+    // `config show` exits 1 for a name it does not know — which includes every
+    // ALIAS (`agy`, `opc`), since dispatch canonicalizes but this command does
+    // not. Returning null here would mean "inherits defaults", so
+    // `--channels agy --timeout 900` would sail past a guard whose entire
+    // purpose is catching that antigravity ignores the flag. UNKNOWN is its own
+    // answer, and the caller refuses on it.
+    return UNKNOWN_TIMEOUT
+  } finally {
+    fs.rmSync(neutral, { recursive: true, force: true })
+  }
+}
+
+/**
+ * Why a requested `--timeout` would not hold for the given channels, or null.
+ *
+ * `entries` is [channel, channelLevelTimeout] pairs. Pure so selftest can cover
+ * the alias case without a built MMR that defines one.
+ */
+function timeoutBindingProblem(entries, requested) {
+  if (requested === null) return null
+  const unresolved = entries.filter(([, t]) => t === UNKNOWN_TIMEOUT).map(([c]) => c)
+  if (unresolved.length > 0) {
+    return `could not resolve the channel configuration for ${unresolved.join(', ')}, so it `
+      + 'cannot be confirmed that --timeout applies to them. `mmr config show` does not accept '
+      + 'channel aliases — name the channels canonically (antigravity, not agy; opencode, '
+      + 'not opc).'
+  }
+  const unbounded = entries.filter(([, t]) => t !== null && t !== requested)
+  if (unbounded.length > 0) {
+    return `--timeout ${requested} would not apply to `
+      + `${unbounded.map(([c, t]) => `${c} (has its own timeout: ${t})`).join(', ')}. `
+      + 'MMR overrides defaults.timeout only, so a channel with its own keeps it. '
+      + 'Drop those channels, or set their timeout in ~/.mmr/config.yaml to match.'
+  }
+  return null
 }
 /** The rubric's floor. Below this, run-to-run variance dominates any effect. */
 const MIN_RUNS = 6
@@ -348,7 +451,7 @@ const BOOLEAN_FLAGS = new Set(['force'])
  */
 const KNOWN_FLAGS = new Set([
   'out', 'paired', 'config', 'pr', 'diff', 'channels', 'n', 'force',
-  'judge', 'scores', 'baseline', 'candidate',
+  'judge', 'scores', 'baseline', 'candidate', 'baseline-mmr', 'timeout',
 ])
 
 /**
@@ -524,13 +627,13 @@ function normalizeChannels(list) {
  * One review run against a fixed diff. Shared by the plain and paired paths so
  * they cannot drift apart in how a run is dispatched or recorded.
  */
-function runOnce({ mmrArgs, cwd, target, index, total, label }) {
+function runOnce({ mmr = MMR, mmrArgs, cwd, target, index, total, label }) {
   fs.rmSync(target, { force: true })
   process.stderr.write(`[${label}] run ${index}/${total} … `)
   const started = Date.now()
   let raw
   try {
-    raw = execFileSync('node', [MMR, ...mmrArgs], {
+    raw = execFileSync('node', [mmr, ...mmrArgs], {
       encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024, cwd,
     })
   } catch (err) {
@@ -721,6 +824,64 @@ function prepareOutDir(dir, forced) {
   fs.writeFileSync(path.join(dir, OWNER_FILE), 'finding-quality harness output directory\n')
 }
 
+/**
+ * Argument-level problems in a `collect` invocation, as a problem string or
+ * null.
+ *
+ * Pure over `facts` — every filesystem question is answered by the caller and
+ * passed in — so `selftest` can drive branches that otherwise need a built
+ * second package on disk and an hour of collection to reach. The validation
+ * that guards an expensive, long-running command is exactly the validation
+ * worth testing, and inline in `collect` none of it was reachable.
+ */
+function collectProblem(facts) {
+  const {
+    baselineMmrGiven, paired, config, timeout,
+    entryIsDistIndex, entryExists, hasDist, hasTemplates, hasManifest, sameBuild,
+  } = facts
+  if (timeout !== null && (!Number.isInteger(timeout) || timeout < 1)) {
+    return '--timeout must be a positive integer number of seconds'
+  }
+  if (!baselineMmrGiven) {
+    if (paired && !config) {
+      return '--paired needs --config or --baseline-mmr: the paired arm IS the candidate treatment'
+    }
+    return null
+  }
+  // Unpaired collection runs a single arm, so there is no baseline arm for a
+  // second build to be the baseline OF. Silently ignoring the flag would run an
+  // hour of the wrong condition.
+  if (!paired) return '--baseline-mmr requires --paired: it names the build for the baseline arm'
+  // Two treatment mechanisms at once is two treatments, and provenance can only
+  // record one: `treatment: "build"` would be written while the candidate arm
+  // ALSO carried a config the baseline lacked, so a config effect would be
+  // reported as a build effect with nothing able to detect it.
+  if (config) {
+    return '--config and --baseline-mmr are two different treatments — passing both makes the '
+      + 'arms differ in build AND configuration, and provenance can record only one cause. '
+      + 'Run them as separate experiments.'
+  }
+  if (!entryExists) return 'not found'
+  // pkgRootOf resolves the entry point upward exactly one level, so anything
+  // not shaped like <package>/dist/index.js resolves to the wrong root — one
+  // with no dist/ or templates/, where buildDigest walks nothing and digests
+  // the empty string. Two such paths compare equal, and a declared build
+  // treatment silently has no treatment.
+  if (!entryIsDistIndex) return 'must point at <package>/dist/index.js'
+  if (!hasDist || !hasTemplates) {
+    return 'does not look like a built MMR package: dist/ and templates/ must both exist beside it'
+  }
+  // Without it, collect records manifestDigest: null and `report` then refuses
+  // the finished experiment — an hour of collection spent to learn something
+  // knowable before the first run.
+  if (!hasManifest) {
+    return 'has no package.json, so the two arms cannot be shown to declare the same '
+      + 'dependencies — a build treatment requires one'
+  }
+  if (sameBuild) return 'is byte-identical to this build — there is no treatment'
+  return null
+}
+
 function collect(args) {
   // Absolute from here on. The MMR child runs with cwd=repoRoot, so a relative
   // --out would hand it a --diff path resolved against the repo root instead of
@@ -730,12 +891,64 @@ function collect(args) {
   // --paired names the OTHER arm's directory. Both arms are then collected in
   // one interleaved pass — see the loop below for why that matters.
   const pairedOut = args.paired ? path.resolve(args.paired) : null
-  if (pairedOut !== null) {
-    if (pairedOut === outDir) die('--paired must name a different directory from --out')
-    if (!args.config) die('--paired needs --config: the paired arm IS the candidate treatment')
+  // A treatment that lives in the built package — a prompt template the config
+  // schema deliberately cannot reach — cannot be delivered by --config at all.
+  // --baseline-mmr runs the BASELINE arm from a second built package, leaving
+  // the candidate on this one. Everything else about the two arms is still held
+  // identical, and `report` still refuses a verdict when the two assembled
+  // prompts turn out the same.
+  const baselineMmr = args['baseline-mmr'] ? path.resolve(args['baseline-mmr']) : MMR
+  if (pairedOut !== null && pairedOut === outDir) {
+    die('--paired must name a different directory from --out')
+  }
+  const channelTimeout = args.timeout === undefined ? null : Number(args.timeout)
+  {
+    // From the FLAG's presence, not from whether the path happens to differ.
+    // Inferring it meant `--baseline-mmr <this build's own dist/index.js>`
+    // resolved equal to MMR, read as "not given", and silently skipped the
+    // --paired requirement and the --config conflict check — an explicit
+    // build-treatment request quietly demoted to a config treatment.
+    const given = args['baseline-mmr'] !== undefined
+    // Answered here so collectProblem itself stays pure and testable. The
+    // digest comparison is skipped unless the layout is right, because on a
+    // wrong root buildDigest walks nothing and digests the empty string.
+    const baseRoot = pkgRootOf(baselineMmr)
+    const entryExists = given && fs.existsSync(baselineMmr)
+    const entryIsDistIndex = path.basename(baselineMmr) === 'index.js'
+      && path.basename(path.dirname(baselineMmr)) === 'dist'
+    const hasDist = entryExists && fs.existsSync(path.join(baseRoot, 'dist'))
+    const hasTemplates = entryExists && fs.existsSync(path.join(baseRoot, 'templates'))
+    const hasManifest = entryExists && fs.existsSync(path.join(baseRoot, 'package.json'))
+    const problem = collectProblem({
+      baselineMmrGiven: given,
+      paired: pairedOut !== null,
+      config: Boolean(args.config),
+      timeout: channelTimeout,
+      entryExists,
+      entryIsDistIndex,
+      hasDist,
+      hasTemplates,
+      hasManifest,
+      sameBuild: given && entryIsDistIndex && hasDist && hasTemplates
+        && buildDigest(baseRoot) === buildDigest(),
+    })
+    if (problem !== null) {
+      die(problem.startsWith('--') ? problem : `--baseline-mmr ${baselineMmr} ${problem}`)
+    }
   }
   const n = Number(args.n ?? MIN_RUNS)
   const channels = args.channels ?? die('--channels required')
+  if (channelTimeout !== null) {
+    // --timeout that does not actually bind is worse than no --timeout: the
+    // experiment reads as bounded, and the channel that ignored it degrades a
+    // condition anyway. Refused rather than warned, because a warning scrolls
+    // past in an hour-long collection.
+    const problem = timeoutBindingProblem(
+      normalizeChannels(channels).split(',').map((c) => [c, channelLevelTimeout(c)]),
+      channelTimeout,
+    )
+    if (problem !== null) die(problem)
+  }
   if (!args.pr && !args.diff) die('--pr or --diff required')
   if (!Number.isInteger(n) || n < 1) die('--n must be a positive integer')
   if (n < MIN_RUNS) {
@@ -856,7 +1069,19 @@ function collect(args) {
     target: args.pr ? `pr:${args.pr}` : `diff:${path.basename(path.resolve(args.diff))}`,
     diffDigest: sha256(reviewedDiff),
     channels: normalizeChannels(channels),
-    mmrDigest: buildDigest(),
+    // Which field carries the treatment. `config` is the original mode: one
+    // build, a candidate .mmr.yaml in the candidate arm's cwd. `build` is for a
+    // treatment that lives in the built package itself — a template the config
+    // schema cannot reach — where mmrDigest and basePromptDigest are EXPECTED to
+    // differ instead of expected to match. Recorded rather than inferred: a
+    // reader of these files should not have to deduce which invariants applied.
+    // From the flag, for the same reason `given` is: a path that resolves to
+    // this build is a rejected build treatment, never a config one.
+    treatment: args['baseline-mmr'] === undefined ? 'config' : 'build',
+    // Recorded so a reader knows what bounded the runs. Identical in both arms
+    // by construction — it comes from one invocation — so it is documentation
+    // here, not a check.
+    channelTimeout,
     // Resolved commands/models/parsers, so a user-level config change between
     // the two collections cannot be reported as a prompt effect.
     channelConfigDigest: requireChannelDigest(),
@@ -878,6 +1103,14 @@ function collect(args) {
   const argsFor = (dir, trusted) => [
     'review', '--channels', channels, '--sync', '--format', 'json',
     '--diff', path.join(dir, SNAPSHOT_FILE),
+    // Identical in both arms by construction. A channel that times out
+    // contributes no findings, and the rubric treats that as invalidating the
+    // whole condition — so on a slow model or a long diff the default bounds
+    // what can be measured at all. Passed as a flag rather than set in the
+    // user's config: config would leak into every unrelated review on the
+    // machine, and a candidate .mmr.yaml may not carry it (it changes how the
+    // review RUNS, which is exactly what must be held constant).
+    ...(channelTimeout === null ? [] : ['--timeout', String(channelTimeout)]),
     ...(trusted ? ['--trust-project-config'] : []),
   ]
   // The candidate arm needs --trust-project-config to have the .mmr.yaml in its
@@ -899,7 +1132,7 @@ function collect(args) {
     // Every arm's snapshot must exist before --dry-run can resolve it.
     fs.writeFileSync(path.join(outDir, SNAPSHOT_FILE), reviewedDiff)
     if (pairedOut) fs.writeFileSync(path.join(pairedOut, SNAPSHOT_FILE), reviewedDiff)
-    const assemble = (mmrArgs, cwd) => execFileSync('node', [MMR, ...mmrArgs, '--dry-run'], {
+    const assemble = (mmrArgs, cwd, mmr = MMR) => execFileSync('node', [mmr, ...mmrArgs, '--dry-run'], {
       encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024, cwd,
     })
     let dryRun
@@ -908,9 +1141,16 @@ function collect(args) {
     // change between two separate collections detectable. promptDigest cannot
     // do that job — it is supposed to differ, since it is the treatment.
     let baselineDryRun = null
+    // Under a build treatment the candidate's own untreated prompt is a
+    // different thing from the baseline's — the difference between the two IS
+    // the treatment — so it has to be assembled from the candidate build too.
+    let candidateBaseDryRun = null
     try {
       dryRun = assemble(candidateArgs, args.config ? candidateCwd : baselineCwd)
-      baselineDryRun = assemble(baselineArgs, baselineCwd)
+      baselineDryRun = assemble(baselineArgs, baselineCwd, baselineMmr)
+      candidateBaseDryRun = provenanceBase.treatment === 'build'
+        ? assemble(baselineArgs, baselineCwd)
+        : baselineDryRun
     } catch (err) {
       const detail = (err.stderr || err.message || '').toString().slice(0, 300)
       die(`could not assemble the prompt for this condition: ${detail}`)
@@ -926,20 +1166,35 @@ function collect(args) {
     const arms = pairedOut === null
       ? [{
         dir: outDir,
+        mmr: MMR,
+        baseSource: candidateBaseDryRun,
         mmrArgs: candidateArgs,
         cwd: args.config ? candidateCwd : baselineCwd,
         promptSource: dryRun,
       }]
       : [
-        { dir: outDir, mmrArgs: baselineArgs, cwd: baselineCwd, promptSource: baselineDryRun },
-        { dir: pairedOut, mmrArgs: candidateArgs, cwd: candidateCwd, promptSource: dryRun },
+        {
+          dir: outDir,
+          mmr: baselineMmr,
+          baseSource: baselineDryRun,
+          mmrArgs: baselineArgs,
+          cwd: baselineCwd,
+          promptSource: baselineDryRun,
+        },
+        {
+          dir: pairedOut,
+          mmr: MMR,
+          baseSource: candidateBaseDryRun,
+          mmrArgs: candidateArgs,
+          cwd: candidateCwd,
+          promptSource: dryRun,
+        },
       ]
 
     // Written incomplete first. An interrupted collection leaves its finished
     // runs on disk, and with --n above the floor report would otherwise see
     // enough of them to call a truncated condition complete and issue a verdict
     // from it.
-    const basePromptDigest = sha256(canonicalPrompts(baselineDryRun) ?? '')
     const provPaths = []
     for (const arm of arms) {
       const promptOnly = canonicalPrompts(arm.promptSource)
@@ -947,15 +1202,38 @@ function collect(args) {
       const provenance = {
         ...provenanceBase,
         promptDigest: sha256(promptOnly),
-        // The untreated prompt, identical in both arms by definition. A
+        // The untreated prompt this arm's build produces. Under a config
+        // treatment it is identical in both arms by definition, and a
         // difference means the user-level configuration moved between the two
-        // collections, which no other recorded field can distinguish from the
-        // treatment itself.
-        basePromptDigest,
+        // collections — which no other recorded field can distinguish from the
+        // treatment itself. Under a build treatment it is expected to differ,
+        // because the build is what changed.
+        basePromptDigest: sha256(canonicalPrompts(arm.baseSource) ?? ''),
+        // Per-arm, because under a build treatment the two arms deliberately
+        // run different builds. `report` decides which relationship to require.
+        mmrDigest: buildDigest(pkgRootOf(arm.mmr)),
+        // Split, because "the build differs" is too coarse to license. Two
+        // builds can differ in dispatch logic, parsers, defaults or
+        // dependencies, and any finding difference would then be attributed to
+        // the prompt. A build treatment must change what the review ASKS —
+        // templates — and nothing about how it RUNS, which is the same line
+        // PROMPT_ONLY_KEYS draws for a config treatment.
+        distDigest: buildDigest(pkgRootOf(arm.mmr), ['dist']),
+        templatesDigest: buildDigest(pkgRootOf(arm.mmr), ['templates']),
+        // dist/ and templates/ are not the whole runtime. Two package roots can
+        // declare different dependencies — a baseline built at an old commit
+        // with its own `npm ci` resolves its own tree — and a dependency delta
+        // would ride along inside a "prompt" treatment. The manifest is what
+        // declares them, so it must match too.
+        manifestDigest: (() => {
+          const p = path.join(pkgRootOf(arm.mmr), 'package.json')
+          return fs.existsSync(p) ? sha256(fs.readFileSync(p, 'utf-8')) : null
+        })(),
         requestedRuns: n,
         complete: false,
       }
       arm.recordedPromptDigest = provenance.promptDigest
+      arm.recordedMmrDigest = provenance.mmrDigest
       const pp = path.join(arm.dir, PROVENANCE_FILE)
       fs.writeFileSync(pp, JSON.stringify(provenance, null, 2))
       fs.writeFileSync(path.join(arm.dir, SNAPSHOT_FILE), reviewedDiff)
@@ -967,9 +1245,15 @@ function collect(args) {
     // one condition spanning two execution environments, which no later check
     // can detect from the run files alone.
     const assertEnvironmentUnchanged = (arm) => {
-      if (buildDigest() !== provenanceBase.mmrDigest) {
-        die('the MMR build changed during collection (was it rebuilt?). '
-          + 'The runs so far span more than one build — re-collect.')
+      // Every arm's build, not just the one being run: a rebuild of the OTHER
+      // arm's package mid-collection still splits the experiment across two
+      // execution environments, and the arm it belongs to may not be the one
+      // that happens to be checked next.
+      for (const a of arms) {
+        if (buildDigest(pkgRootOf(a.mmr)) !== a.recordedMmrDigest) {
+          die(`the MMR build for ${conditionLabel(a.dir)} changed during collection `
+            + '(was it rebuilt?). The runs so far span more than one build — re-collect.')
+        }
       }
       if (requireChannelDigest() !== provenanceBase.channelConfigDigest) {
         die('the resolved channel configuration changed during collection. '
@@ -993,7 +1277,7 @@ function collect(args) {
       if (arm) {
         let reassembled
         try {
-          reassembled = assemble(arm.mmrArgs, arm.cwd)
+          reassembled = assemble(arm.mmrArgs, arm.cwd, arm.mmr)
         } catch (err) {
           const detail = (err.stderr || err.message || '').toString().slice(0, 300)
           return die(`could not re-assemble the prompt mid-collection: ${detail}`)
@@ -1026,6 +1310,7 @@ function collect(args) {
       for (const arm of order) {
         assertEnvironmentUnchanged(arm)
         runOnce({
+          mmr: arm.mmr,
           mmrArgs: arm.mmrArgs,
           cwd: arm.cwd,
           target: path.join(arm.dir, `run-${String(i).padStart(padWidth, '0')}.json`),
@@ -1203,12 +1488,46 @@ function assertJudgeSandboxed(judge) {
 
 // ------------------------------------------------------------------ score
 
+/**
+ * The first condition that is not a finished collection, as a problem string,
+ * or null when all of them are.
+ *
+ * `score` spends real judge calls, so an unfinished arm has to be refused
+ * BEFORE the judge runs — not two steps later in `report`. Scoring an in-flight
+ * collection silently judges whatever runs happen to be on disk and writes a
+ * scores file indistinguishable from a complete one.
+ */
+function incompleteConditionProblem(conditions) {
+  for (const c of conditions) {
+    if (c.provenance === null || c.provenance === undefined) {
+      return `${c.label} has no provenance.json — run \`collect\` for it first`
+    }
+    if (c.provenance.complete !== true) {
+      return `${c.label} is still collecting (or was interrupted): it holds `
+        + `${c.runs.length} of ${c.provenance.requestedRuns} run(s). `
+        + 'Wait for `collect` to finish, or re-run it.'
+    }
+    // complete=true only records that collect finished; it does not survive a
+    // run file being removed afterwards. `report` checks this too, but score
+    // spends judge calls first, so it has to check here as well.
+    if (c.provenance.requestedRuns !== c.runs.length) {
+      return `${c.label} holds ${c.runs.length} run(s) but ${c.provenance.requestedRuns} `
+        + 'were requested — re-collect it'
+    }
+  }
+  return null
+}
+
 function score(args) {
   if (args.out !== undefined) {
     die('score writes a scores FILE — did you mean --scores? '
       + '(--out is collect\'s run directory)')
   }
   const conditions = loadArms(args)
+  {
+    const problem = incompleteConditionProblem(conditions)
+    if (problem !== null) die(problem)
+  }
   const judge = args.judge ?? 'claude'
   const rubric = fs.readFileSync(RUBRIC, 'utf-8')
 
@@ -1676,6 +1995,155 @@ function evaluateVerdict(base, cand, opts = {}) {
   }
 }
 
+/**
+ * Preconditions the two conditions must satisfy before any verdict is issued:
+ * both complete, both holding the runs they claim, both reviewing the same
+ * input through the same channels, and differing in exactly the field that
+ * carries the treatment.
+ *
+ * Extracted from `report` so the treatment-kind branch is reachable by
+ * `selftest`. Inline, the only way to exercise "a build treatment whose two
+ * arms turn out to share a build" was to run a full collection and hand-edit
+ * the provenance afterwards, which is why the rule most likely to invert
+ * silently was the one rule nothing checked.
+ *
+ * Returns blocker strings; empty means the preconditions hold.
+ */
+function provenanceBlockers(conditions) {
+  const out = []
+  const bp = conditions[0].provenance
+  const cp = conditions[1].provenance
+  if (!bp || !cp) {
+    out.push('a condition has no provenance.json — re-run `collect` so the reviewed '
+      + 'diff, channel set, and MMR build are recorded')
+    return out
+  }
+  for (const [cond, prov] of [[conditions[0], bp], [conditions[1], cp]]) {
+    if (prov.complete !== true) {
+      out.push(`${cond.label} was never finished — re-run \`collect\` for it`)
+    } else if (prov.requestedRuns !== cond.runs.length) {
+      out.push(`${cond.label} holds ${cond.runs.length} run(s) but ${prov.requestedRuns} `
+        + 'were requested — re-collect it')
+    }
+  }
+  // Which fields carry the treatment, and which must therefore be held
+  // identical. Provenance written before build treatments existed has no
+  // `treatment` key and could only ever have been a config treatment.
+  const bTreat = bp.treatment ?? 'config'
+  const cTreat = cp.treatment ?? 'config'
+  if (bTreat !== cTreat) {
+    out.push(`the arms used different treatment kinds (${bTreat} vs ${cTreat}) `
+      + '— re-collect both in one paired pass')
+  }
+  // Under a build treatment the build IS the change, so requiring these to
+  // match would block the experiment they exist to make possible — but they
+  // must then actually differ, or the two arms ran the same build and any gap
+  // between them is resampling. Requires BOTH sides to declare it, so a single
+  // hand-edited provenance cannot switch off a guard for the pair.
+  const buildTreatment = bTreat === 'build' && cTreat === 'build'
+  const mustDiffer = buildTreatment ? ['mmrDigest', 'basePromptDigest'] : []
+  // "The build differs" is too coarse to license. Two builds can differ in
+  // dispatch logic, parsers, defaults or dependencies, and every finding
+  // difference would then be credited to the prompt. So a build treatment must
+  // change templates/ and NOTHING in dist/ — the same line PROMPT_ONLY_KEYS
+  // draws for a config treatment, applied to a build.
+  // REQUIRED under a build treatment, never waived. Build treatments and these
+  // digests shipped together, so no legacy build-treatment provenance can
+  // exist — a missing field means hand-edited or truncated data, and treating
+  // it as "nothing to check" would let the one guard that makes a build
+  // treatment meaningful be switched off by deleting a key.
+  if (buildTreatment) {
+    const missing = ['distDigest', 'templatesDigest', 'manifestDigest'].filter(
+      (k) => bp[k] === undefined || bp[k] === null || cp[k] === undefined || cp[k] === null,
+    )
+    if (missing.length > 0) {
+      out.push(`${missing.join(' and ')} missing from a build-treatment condition — these record `
+        + 'that the arms differ only in templates/, and a build treatment cannot be verified '
+        + 'without them. Re-run `collect`.')
+    } else {
+      if (bp.distDigest !== cp.distDigest) {
+        out.push('the two builds differ in dist/, not only in templates/ — a build treatment may '
+          + 'change what the review ASKS, never how it RUNS, or finding differences cannot be '
+          + 'attributed to the prompt')
+      }
+      // Necessary, not sufficient, and deliberately so: identical semver ranges
+      // can still RESOLVE to different installed versions in two separately
+      // installed trees. Proving the trees equal would mean digesting
+      // node_modules, which is enormous and mostly irrelevant to a review.
+      // Matching manifests catches the realistic mistake — a baseline built
+      // from a commit whose dependencies had moved — and the residual risk is
+      // recorded here rather than papered over.
+      if (bp.manifestDigest !== cp.manifestDigest) {
+        out.push('the two builds declare different package manifests — their dependency trees '
+          + 'may differ, so a difference in findings cannot be attributed to the prompt')
+      }
+      if (bp.templatesDigest === cp.templatesDigest) {
+        out.push('the two builds have identical templates/ — a build treatment with no prompt '
+          + 'difference is not a treatment')
+      }
+    }
+  }
+  // The per-channel timeout bounds what each run could produce: a channel that
+  // times out in one arm and completes in the other contributes findings to
+  // only one side. Paired collection cannot differ here — one invocation sets
+  // both — but two conditions collected SEPARATELY can, and nothing else
+  // recorded would show it. Absent on both sides means provenance predating the
+  // flag, where no timeout was passed either; absent on one side is a real
+  // mismatch between a collection that set it and one that did not.
+  if (bp.channelTimeout !== undefined || cp.channelTimeout !== undefined) {
+    if (JSON.stringify(bp.channelTimeout ?? null) !== JSON.stringify(cp.channelTimeout ?? null)) {
+      out.push(`channelTimeout differs between conditions (${bp.channelTimeout ?? 'unset'} vs `
+        + `${cp.channelTimeout ?? 'unset'}) — a channel could time out in one arm and complete `
+        + 'in the other, so the arms did not run under the same bound')
+    }
+  }
+  for (const key of [
+    'target', 'diffDigest', 'mmrDigest', 'repoCommit', 'channelConfigDigest',
+    'basePromptDigest', 'promptDigest',
+  ]) {
+    // Absent on both sides is NOT a match: JSON.stringify(undefined) equals
+    // itself, so two conditions missing a field would have "agreed" on it and
+    // an unverifiable precondition would read as verified.
+    if (bp[key] === undefined || bp[key] === null || cp[key] === undefined || cp[key] === null) {
+      out.push(`${key} is missing from ${bp[key] == null ? conditions[0].label : ''}`
+        + `${bp[key] == null && cp[key] == null ? ' and ' : ''}`
+        + `${cp[key] == null ? conditions[1].label : ''} — re-run \`collect\``)
+      continue
+    }
+    if (key === 'promptDigest') continue   // must DIFFER; handled by sameTreatment
+    if (mustDiffer.includes(key)) {
+      if (JSON.stringify(bp[key]) === JSON.stringify(cp[key])) {
+        out.push(`${key} is identical across the arms (${bp[key]}), but this experiment `
+          + 'declares a build treatment — the two arms ran the same build, so there is '
+          + 'nothing to compare')
+      }
+      continue
+    }
+    if (JSON.stringify(bp[key]) !== JSON.stringify(cp[key])) {
+      out.push(`${key} differs between conditions (${bp[key]} vs ${cp[key]}) — `
+        + 'the arms did not review the same thing')
+    }
+  }
+  // Compare what was DISPATCHED, not the --channels string. MMR canonicalizes
+  // aliases (agy resolves to antigravity) and de-duplicates, so the request
+  // string and the result keys legitimately differ and comparing them would
+  // block a valid experiment. Every run must dispatch the same set, and both
+  // arms must agree — which is the property that actually matters.
+  const dispatchSets = new Set()
+  for (const cond of [conditions[0], conditions[1]]) {
+    const perCond = new Set(cond.runs.map((r) => r.dispatched))
+    if (perCond.size > 1) {
+      out.push(`${cond.label} dispatched different channel sets across its runs `
+        + `(${[...perCond].join(' vs ')})`)
+    }
+    for (const d of perCond) dispatchSets.add(d)
+  }
+  if (dispatchSets.size > 1) {
+    out.push(`the arms dispatched different channel sets (${[...dispatchSets].join(' vs ')})`)
+  }
+  return out
+}
+
 function report(args) {
   if (args.out !== undefined) {
     die('report writes nothing — did you mean --scores? '
@@ -1761,59 +2229,9 @@ function report(args) {
 
   const [base, cand] = rows
 
-  // Everything except the config digest must match: the config IS the treatment.
-  const extraBlockers = []
   const bp = conditions[0].provenance
   const cp = conditions[1].provenance
-  if (!bp || !cp) {
-    extraBlockers.push('a condition has no provenance.json — re-run `collect` so the reviewed '
-      + 'diff, channel set, and MMR build are recorded')
-  } else {
-    for (const [cond, prov] of [[conditions[0], bp], [conditions[1], cp]]) {
-      if (prov.complete !== true) {
-        extraBlockers.push(`${cond.label} was never finished — re-run \`collect\` for it`)
-      } else if (prov.requestedRuns !== cond.runs.length) {
-        extraBlockers.push(`${cond.label} holds ${cond.runs.length} run(s) but ${prov.requestedRuns} `
-          + 'were requested — re-collect it')
-      }
-    }
-    for (const key of [
-      'target', 'diffDigest', 'mmrDigest', 'repoCommit', 'channelConfigDigest',
-      'basePromptDigest', 'promptDigest',
-    ]) {
-      // Absent on both sides is NOT a match: JSON.stringify(undefined) equals
-      // itself, so two conditions missing a field would have "agreed" on it and
-      // an unverifiable precondition would read as verified.
-      if (bp[key] === undefined || bp[key] === null || cp[key] === undefined || cp[key] === null) {
-        extraBlockers.push(`${key} is missing from ${bp[key] == null ? conditions[0].label : ''}`
-          + `${bp[key] == null && cp[key] == null ? ' and ' : ''}`
-          + `${cp[key] == null ? conditions[1].label : ''} — re-run \`collect\``)
-        continue
-      }
-      if (key === 'promptDigest') continue   // must DIFFER; handled by sameTreatment
-      if (JSON.stringify(bp[key]) !== JSON.stringify(cp[key])) {
-        extraBlockers.push(`${key} differs between conditions (${bp[key]} vs ${cp[key]}) — `
-          + 'the arms did not review the same thing')
-      }
-    }
-    // Compare what was DISPATCHED, not the --channels string. MMR canonicalizes
-    // aliases (agy resolves to antigravity) and de-duplicates, so the request
-    // string and the result keys legitimately differ and comparing them would
-    // block a valid experiment. Every run must dispatch the same set, and both
-    // arms must agree — which is the property that actually matters.
-    const dispatchSets = new Set()
-    for (const cond of [conditions[0], conditions[1]]) {
-      const perCond = new Set(cond.runs.map((r) => r.dispatched))
-      if (perCond.size > 1) {
-        extraBlockers.push(`${cond.label} dispatched different channel sets across its runs `
-          + `(${[...perCond].join(' vs ')})`)
-      }
-      for (const d of perCond) dispatchSets.add(d)
-    }
-    if (dispatchSets.size > 1) {
-      extraBlockers.push(`the arms dispatched different channel sets (${[...dispatchSets].join(' vs ')})`)
-    }
-  }
+  const extraBlockers = provenanceBlockers(conditions)
 
   // Identical assembled prompts mean there is no treatment, whatever the
   // configs looked like on disk.
@@ -1882,6 +2300,223 @@ function selftest() {
   assert.equal(parseArgs(['--force'])['force'], true)
   assert.equal(parseArgs(['--force', '--out', 'x'])['force'], true)
   assert.equal(parseArgs(['--out', 'x', '--force'])['force'], true)
+
+  // --- provenance preconditions -------------------------------------------
+  // A pair of provenance records that satisfies every precondition, so each
+  // case below varies exactly one thing and the rest stay valid.
+  const prov = (over = {}) => ({
+    target: 'pr:1', diffDigest: 'd', repoCommit: 'c', channelConfigDigest: 'cc',
+    mmrDigest: 'm', basePromptDigest: 'b', promptDigest: 'p',
+    requestedRuns: 2, complete: true, ...over,
+  })
+  const conds = (bOver, cOver) => [
+    { label: 'baseline', provenance: prov(bOver), runs: [{ dispatched: 'a,b' }, { dispatched: 'a,b' }] },
+    {
+      label: 'candidate',
+      provenance: prov({ promptDigest: 'q', ...cOver }),
+      runs: [{ dispatched: 'a,b' }, { dispatched: 'a,b' }],
+    },
+  ]
+  assert.deepEqual(provenanceBlockers(conds({}, {})), [])
+
+  // Config treatment (the default, and the explicit one): a differing build is
+  // a confound, not a treatment.
+  for (const t of [{}, { treatment: 'config' }]) {
+    const blockers = provenanceBlockers(conds(t, { ...t, mmrDigest: 'm2' }))
+    assert.equal(blockers.length, 1, 'a differing build must block a config treatment')
+    assert.match(blockers[0], /mmrDigest differs/)
+  }
+
+  // Build treatment: the build and the untreated prompt are the treatment, so
+  // they must differ — and everything else must still match.
+  // A build treatment always carries the split digests, so the fixtures do too.
+  const build = { treatment: 'build', distDigest: 'd', templatesDigest: 't', manifestDigest: 'pk' }
+  assert.deepEqual(
+    provenanceBlockers(conds(build, {
+      ...build, mmrDigest: 'm2', basePromptDigest: 'b2', templatesDigest: 't2',
+    })),
+    [],
+  )
+  for (const key of ['mmrDigest', 'basePromptDigest']) {
+    const same = {
+      ...build, mmrDigest: 'm2', basePromptDigest: 'b2', templatesDigest: 't2', [key]: prov()[key],
+    }
+    const blockers = provenanceBlockers(conds(build, same))
+    assert.equal(blockers.length, 1, `an identical ${key} must block a build treatment`)
+    assert.match(blockers[0], new RegExp(`^${key} is identical`))
+  }
+  // A build treatment may change templates/ but nothing in dist/: otherwise the
+  // arms differ in how the review RUNS and no finding difference is
+  // attributable to the prompt.
+  // Baseline keeps the fixture's default digests; only the candidate moves, so
+  // the mustDiffer fields genuinely differ and these cases isolate dist vs
+  // templates.
+  const btBase = (over = {}) => ({ ...build, distDigest: 'd', templatesDigest: 't', manifestDigest: 'pk', ...over })
+  const btCand = (over = {}) => ({
+    ...build, mmrDigest: 'm2', basePromptDigest: 'b2', distDigest: 'd', templatesDigest: 't2',
+    manifestDigest: 'pk', ...over,
+  })
+  assert.deepEqual(
+    provenanceBlockers(conds(btBase(), btCand())),
+    [],
+    'same dist, different templates is the valid shape',
+  )
+  assert.match(
+    provenanceBlockers(conds(btBase(), btCand({ distDigest: 'd2' })))[0],
+    /differ in dist\//,
+  )
+  assert.match(
+    provenanceBlockers(conds(btBase(), btCand({ templatesDigest: 't' })))[0],
+    /identical templates\//,
+  )
+  // dist/ and templates/ are not the whole runtime: a baseline built at an old
+  // commit resolves its own dependency tree, and that delta would ride along
+  // inside a "prompt" treatment.
+  assert.match(
+    provenanceBlockers(conds(btBase(), btCand({ manifestDigest: 'pk2' })))[0],
+    /different package manifests/,
+  )
+  // A build treatment may NOT waive the split digests. They shipped together,
+  // so a missing one is hand-edited data — and waiving it would let the guard
+  // that makes a build treatment meaningful be switched off by deleting a key.
+  const bareBuild = { treatment: 'build' }
+  assert.match(
+    provenanceBlockers(conds(bareBuild, {
+      ...bareBuild, mmrDigest: 'm2', basePromptDigest: 'b2',
+    }))[0],
+    /distDigest and templatesDigest and manifestDigest missing/,
+  )
+  assert.match(
+    provenanceBlockers(conds(btBase(), btCand({ templatesDigest: undefined })))[0],
+    /templatesDigest missing/,
+  )
+  // A CONFIG treatment predating the fields is genuine legacy data and still
+  // validates — the distinction is that config treatments existed before them.
+  assert.deepEqual(provenanceBlockers(conds({}, {})), [])
+
+  // The build treatment relaxes ONLY those two fields: an otherwise-valid build
+  // pair with a differing diffDigest is still blocked.
+  assert.ok(
+    provenanceBlockers(conds(build, {
+      ...build, mmrDigest: 'm2', basePromptDigest: 'b2', templatesDigest: 't2', diffDigest: 'd2',
+    })).some((b) => /diffDigest differs/.test(b)),
+  )
+  // One side declaring a build treatment is a mismatch, and must not relax the
+  // other side's guards.
+  const mixed = provenanceBlockers(conds(build, { mmrDigest: 'm2', basePromptDigest: 'b2' }))
+  assert.ok(mixed.some((b) => /different treatment kinds \(build vs config\)/.test(b)))
+  assert.ok(mixed.some((b) => /mmrDigest differs/.test(b)))
+
+  // channelTimeout bounds what a run could produce, so the arms must share it.
+  // Absent on BOTH sides is provenance predating the flag, which is legacy data
+  // rather than a mismatch; absent on one side is a real difference.
+  assert.deepEqual(provenanceBlockers(conds({ channelTimeout: 900 }, { channelTimeout: 900 })), [])
+  assert.match(
+    provenanceBlockers(conds({ channelTimeout: 900 }, { channelTimeout: 300 }))[0],
+    /channelTimeout differs/,
+  )
+  assert.match(
+    provenanceBlockers(conds({ channelTimeout: 900 }, {}))[0],
+    /channelTimeout differs .*900 vs unset/,
+  )
+  assert.deepEqual(provenanceBlockers(conds({}, {})), [], 'legacy provenance must still validate')
+  // null is "no timeout passed", and must not read as a mismatch against a
+  // legacy record that simply lacks the key.
+  assert.deepEqual(provenanceBlockers(conds({ channelTimeout: null }, { channelTimeout: null })), [])
+
+  // --- --timeout binding ----------------------------------------------------
+  assert.equal(timeoutBindingProblem([['codex', null], ['claude', null]], 900), null)
+  assert.equal(timeoutBindingProblem([['opencode', 300]], null), null, 'no --timeout, no claim')
+  assert.match(
+    timeoutBindingProblem([['codex', null], ['opencode', 300]], 900),
+    /would not apply to opencode \(has its own timeout: 300\)/,
+  )
+  assert.equal(
+    timeoutBindingProblem([['opencode', 300]], 300), null,
+    'a channel whose own timeout already equals the request is bound',
+  )
+  // A timeout value that will not parse is UNKNOWN, not "inherits defaults":
+  // reading only leading digits turned 900.5 into 900 and matched a negative
+  // not at all, so an unparseable value reported the channel as bound when
+  // nothing had been verified.
+  assert.match(
+    timeoutBindingProblem([['weird', UNKNOWN_TIMEOUT]], 900),
+    /could not resolve the channel configuration for weird/,
+  )
+  // An unresolvable channel must BLOCK, not read as "inherits defaults" — that
+  // is how `--channels agy --timeout 900` slipped past the guard entirely.
+  assert.match(
+    timeoutBindingProblem([['codex', null], ['agy', UNKNOWN_TIMEOUT]], 900),
+    /could not resolve the channel configuration for agy/,
+  )
+  // Unresolvable is reported ahead of a mere mismatch: it is the more
+  // dangerous of the two, because it is the one that silently passes.
+  assert.match(
+    timeoutBindingProblem([['opencode', 300], ['agy', UNKNOWN_TIMEOUT]], 900),
+    /could not resolve/,
+  )
+
+  // --- score's completeness guard ------------------------------------------
+  const cnd = (over = {}) => ({
+    label: 'arm', runs: [1, 2, 3, 4, 5, 6],
+    provenance: { complete: true, requestedRuns: 6 }, ...over,
+  })
+  assert.equal(incompleteConditionProblem([cnd(), cnd()]), null)
+  assert.match(
+    incompleteConditionProblem([cnd(), cnd({ provenance: { complete: false, requestedRuns: 6 }, runs: [1] })]),
+    /still collecting.*holds 1 of 6 run\(s\)/,
+  )
+  assert.match(
+    incompleteConditionProblem([cnd({ runs: [1, 2, 3] })]),
+    /holds 3 run\(s\) but 6 were requested/,
+    'complete=true does not survive a run file being deleted afterwards',
+  )
+  assert.match(incompleteConditionProblem([cnd({ provenance: null })]), /no provenance\.json/)
+  assert.match(incompleteConditionProblem([cnd({ provenance: undefined })]), /no provenance\.json/)
+  // The FIRST offender is reported, so a complete arm never masks an
+  // incomplete one that follows it.
+  assert.match(
+    incompleteConditionProblem([cnd(), cnd({ label: 'second', provenance: null })]),
+    /^second has no provenance/,
+  )
+
+  // --- collect argument validation ----------------------------------------
+  // A valid build treatment, then one deviation per case.
+  const cf = (over = {}) => ({
+    baselineMmrGiven: true, paired: true, config: false, timeout: null,
+    entryExists: true, entryIsDistIndex: true, hasDist: true, hasTemplates: true,
+    hasManifest: true, sameBuild: false, ...over,
+  })
+  assert.equal(collectProblem(cf()), null)
+  assert.match(collectProblem(cf({ paired: false })), /--baseline-mmr requires --paired/)
+  assert.match(collectProblem(cf({ config: true })), /two different treatments/)
+  assert.match(collectProblem(cf({ entryExists: false })), /not found/)
+  assert.match(collectProblem(cf({ entryIsDistIndex: false })), /dist\/index\.js/)
+  assert.match(collectProblem(cf({ hasTemplates: false })), /built MMR package/)
+  assert.match(collectProblem(cf({ hasDist: false })), /built MMR package/)
+  assert.match(collectProblem(cf({ hasManifest: false })), /no package\.json/)
+  assert.match(collectProblem(cf({ sameBuild: true })), /byte-identical/)
+  // Ordering: --config beats every filesystem complaint, so the message names
+  // the real mistake rather than a symptom of it.
+  assert.match(collectProblem(cf({ config: true, entryExists: false })), /two different treatments/)
+
+  // Timeout is validated for every invocation, not only build treatments.
+  for (const bad of [0, -1, 1.5]) {
+    assert.match(collectProblem(cf({ timeout: bad })), /positive integer/, `timeout ${bad}`)
+    assert.match(
+      collectProblem(cf({ baselineMmrGiven: false, paired: false, timeout: bad })),
+      /positive integer/,
+    )
+  }
+  assert.equal(collectProblem(cf({ timeout: 900 })), null)
+
+  // Config treatments and plain single-arm collections still validate.
+  assert.equal(collectProblem(cf({ baselineMmrGiven: false, paired: true, config: true })), null)
+  assert.equal(collectProblem(cf({ baselineMmrGiven: false, paired: false, config: false })), null)
+  assert.match(
+    collectProblem(cf({ baselineMmrGiven: false, paired: true, config: false })),
+    /--paired needs --config or --baseline-mmr/,
+  )
 
   // Deterministic across calls, and actually permuting.
   const items = Array.from({ length: 20 }, (_, i) => i)
