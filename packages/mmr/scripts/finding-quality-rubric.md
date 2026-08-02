@@ -32,21 +32,27 @@ Three consequences, all binding:
    enforced by construction where it can be, and by instruction where it
    cannot — a judge with filesystem tools and absolute paths could still defeat
    it, so this is a strong convention rather than a sandbox.
-3. A difference smaller than the baseline's own run-to-run spread is **not a
+3. A difference no larger than relabelling the runs would produce is **not a
    result**, and the harness enforces this rather than merely noting it: the
-   *improvement* must exceed the **width** of the baseline's per-run rate
-   spread.
+   two arms' **per-run rates** must separate under an exact one-sided
+   permutation test, at p < 0.05.
 
-   The comparison is deliberately conservative: a pooled improvement measured
-   over N runs varies less than any single run does, so testing it against a
-   single run's spread sets a stricter bar than a like-for-like test would. A
-   ship rule should err toward revert.
+   Pool the 2N per-run rates, enumerate every way to split them into two groups
+   of N, and count the splits whose difference in means is at least the observed
+   drop. At the N = 6 floor that is C(12,6) = 924 splits, enumerated
+   exhaustively, so the answer is exact and identical on every run. Above a
+   split-count limit the harness samples deterministically and says so.
 
-   The margin is the spread's width, not its lowest value. Per-run finding
-   counts here are small enough that a single baseline run can return one
-   finding; if that finding is not speculative, the lowest per-run rate is 0%
-   and a floor-based rule would make shipping arithmetically impossible however
-   good the candidate was.
+   No distributional assumption is made, which matters: rates built from one to
+   six findings per run are nowhere near normal.
+
+   **This replaces a rule that could not be satisfied** — see the change
+   history. The original compared a *pooled* improvement against a *single*
+   run's spread width and called the asymmetry deliberate conservatism. It was
+   not conservatism. A pooled mean over N runs varies far less than one run
+   does, so whenever the baseline's pooled rate was smaller than its own per-run
+   spread, the largest achievable improvement sat below the margin and no
+   candidate could pass — including one scoring a perfect zero.
 
 ## The unit of analysis
 
@@ -65,9 +71,10 @@ instead would leave the arms with unequal N, which the absolute defect count
 cannot survive. Re-collect the condition.
 
 A run that produced **zero** findings also blocks the verdict. Its speculative
-rate is 0/0, so it drops out of the spread that sizes the noise band, making the
-band narrower than the data warrants and the ship rule easier to clear than it
-should be.
+rate is 0/0 — undefined, not zero — so it cannot enter the permutation test as a
+data point. Counting it as 0% would invent a favourable observation, and
+dropping it would leave the arms with unequal N, which the test requires and the
+absolute defect count cannot survive either.
 
 ## Run the arms with the repository present
 
@@ -157,8 +164,9 @@ A change ships only if, across an **equal** number of runs per condition
 1. `speculative_rate` drops, **and**
 2. the **absolute count** of speculative findings drops, **and**
 3. the **absolute count** of low-value findings drops, **and**
-4. the rate drop exceeds the width of the baseline's per-run rate spread
-   (otherwise it is inside the noise band), **and**
+4. the two arms' per-run rates separate under an exact permutation test at
+   p < 0.05 (otherwise the drop is what relabelling the runs would produce),
+   **and**
 5. `defect_count` does not drop, **and**
 6. no **defect site** the baseline found in more than one run goes unfound by
    the candidate.
@@ -223,7 +231,38 @@ observed baseline-vs-baseline spread is not a result.
   mislabelled real defects reaching beyond the diff.
 - `worth_fixing_now` encodes "early-stage product". It is the wrong question for
   a mature codebase and the rubric should not be reused there unchanged.
+- **N = 6 is enough to beat variance in finding COUNTS and not enough to resolve
+  differences in RATES.** Measured: a baseline speculative rate of 8% against a
+  candidate at a perfect 0% — a clean sweep of the primary metric — lands at
+  p = 0.227. The floor was set against the count variance that motivated this
+  rubric, and rate comparisons need materially more runs. A future change
+  wanting a positive result on rule 4 should plan for that, not for a friendlier
+  rule.
 
 ## Change history
 
 - Initial version. No results scored yet.
+- **Rule 4 replaced (after the #807/#808 experiments were scored).** The
+  original required the pooled rate drop to exceed the *width* of the baseline's
+  per-run spread. That is not a strict rule, it is an unsatisfiable one:
+  whenever the baseline's pooled rate is smaller than its own spread, the
+  largest achievable improvement is below the margin, so no candidate can pass.
+  Both measured experiments hit it — #807 target 1 had a pooled baseline rate of
+  8% against a per-run spread of 25%, and its candidate reached 0% and still
+  failed.
+
+  Replaced with an exact one-sided permutation test over the per-run rates,
+  which compares pooled mean against pooled mean.
+
+  Per this file's own amendment procedure, every condition was re-scored from
+  scratch, not one arm. **The new rule changes no verdict.** #808 stage presets:
+  p = 0.561. #807 target 2: p = 1.000. Both remain `revert`, and conditions 2,
+  3, 5 and 6 remain the deciding ones. #807 target 1 can no longer be re-scored
+  at all — a later provenance guard requires build-treatment arms to record
+  their `dist`, `templates` and manifest digests, and that collection predates
+  those fields. Its numbers stand as descriptive only.
+
+  The rule was amended *after* results were known, which is exactly the exposure
+  this file warns about. Two things bound it: the defect was identified from the
+  arithmetic rather than from a disappointing result, and the replacement was
+  validated by showing it rescues nothing.

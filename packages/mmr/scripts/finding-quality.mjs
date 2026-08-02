@@ -246,10 +246,14 @@ const MIN_RUNS = 6
  */
 const DEFECT_MATCH = 0.4
 /**
- * Slack for the noise-band comparison. Both sides are differences of floats, so
- * mathematically equal values can compare unequal — 0.45-0.35 is greater than
- * 0.5-0.4 in IEEE 754. Requiring the improvement to clear the margin by this
- * much makes a tie fail closed, which for a ship rule is the right direction.
+ * Slack for the permutation test's comparison. Both sides are sums of floats,
+ * so mathematically equal values can compare unequal — 0.45-0.35 is greater
+ * than 0.5-0.4 in IEEE 754.
+ *
+ * Applied as `>= threshold - EPSILON`, so a split that merely TIES the observed
+ * drop counts as a hit. That makes p larger, never smaller, so a floating-point
+ * tie pushes the result toward "inside the noise band" — the direction a ship
+ * rule should fail in.
  */
 const BAND_EPSILON = 1e-9
 /**
@@ -1915,6 +1919,90 @@ function summarize(condition, scored) {
  * Extracted so `selftest` exercises the code `report` actually runs. A test
  * that re-implements this arithmetic proves only that the copy is correct.
  */
+/** Significance level for the permutation test. */
+const PERMUTATION_ALPHA = 0.05
+
+/**
+ * Above this many possible splits, enumerate a deterministic sample instead.
+ * C(12,6) is 924, so the N=6 floor is always exact; C(20,10) is 184,756, which
+ * is still fast; beyond that the exhaustive walk stops being worth it.
+ */
+const PERMUTATION_EXACT_LIMIT = 200_000
+
+/** n choose k, exact for the sizes reached here. */
+function choose(n, k) {
+  let r = 1
+  for (let i = 1; i <= k; i++) r = (r * (n - k + i)) / i
+  return Math.round(r)
+}
+
+function meanOf(xs) {
+  return xs.length === 0 ? 0 : xs.reduce((a, b) => a + b, 0) / xs.length
+}
+
+/**
+ * One-sided permutation test on the two arms' per-run rates.
+ *
+ * Asks the only question a noise band should ask: if these 2N runs carried no
+ * treatment at all, how often would relabelling them produce a drop at least
+ * this large? That is a like-for-like comparison — pooled mean against pooled
+ * mean — where the old rule compared a pooled mean against a single run's
+ * spread.
+ *
+ * Exhaustive when the split count allows, so the result is exact and does not
+ * move between invocations. Above the limit it samples deterministically with
+ * the same seeded shuffle used for blinding — never Math.random, which is
+ * unavailable here by design and would make a verdict unreproducible.
+ *
+ * Returns { p, splits, exact }. `p` is 1 for degenerate input (an empty arm, or
+ * arms of unequal length), which fails the rule closed.
+ */
+function permutationTest(baseRates, candRates) {
+  const n = baseRates.length
+  if (n === 0 || candRates.length !== n) return { p: 1, splits: 0, exact: true }
+  const pool = [...baseRates, ...candRates]
+  const observed = meanOf(baseRates) - meanOf(candRates)
+  const total = choose(pool.length, n)
+  const poolSum = pool.reduce((a, b) => a + b, 0)
+  // meanA - meanB reduces to a function of one group's sum, since the other
+  // group's sum is the remainder. Comparing sums avoids re-deriving both means
+  // for every split.
+  const threshold = (observed * n * (pool.length - n)) / pool.length
+  const diffFromSum = (sumA) => sumA - (poolSum * n) / pool.length
+  let hits = 0
+  let splits = 0
+  if (total <= PERMUTATION_EXACT_LIMIT) {
+    // Every combination of n indices, iteratively so deep recursion cannot
+    // blow the stack on larger N.
+    const idx = Array.from({ length: n }, (_, i) => i)
+    for (;;) {
+      let sumA = 0
+      for (const i of idx) sumA += pool[i]
+      if (diffFromSum(sumA) >= threshold - BAND_EPSILON) hits++
+      splits++
+      let i = n - 1
+      while (i >= 0 && idx[i] === pool.length - n + i) i--
+      if (i < 0) break
+      idx[i]++
+      for (let j = i + 1; j < n; j++) idx[j] = idx[j - 1] + 1
+    }
+    return { p: hits / splits, splits, exact: true }
+  }
+  // Deterministic sample. Seeded from the data itself, so the same input always
+  // yields the same p and two different experiments do not share a permutation
+  // order.
+  const seed = Number.parseInt(sha256(JSON.stringify(pool)).slice(0, 8), 16)
+  const SAMPLES = 20_000
+  for (let s = 0; s < SAMPLES; s++) {
+    const shuffled = shuffle(pool, seed + s)
+    let sumA = 0
+    for (let i = 0; i < n; i++) sumA += shuffled[i]
+    if (diffFromSum(sumA) >= threshold - BAND_EPSILON) hits++
+    splits++
+  }
+  return { p: hits / splits, splits, exact: false }
+}
+
 function evaluateVerdict(base, cand, opts = {}) {
   const blockers = []
   for (const r of [base, cand]) {
@@ -1949,25 +2037,25 @@ function evaluateVerdict(base, cand, opts = {}) {
     blockers.push('both conditions used the same config — there is no treatment to measure')
   }
 
-  // Note on strength: this compares a POOLED improvement against a SINGLE
-  // run's spread width. A pooled estimate over N runs varies less than one run
-  // does, so the bar is stricter than a like-for-like test would be. That is
-  // the safe direction for a ship rule — it errs toward revert — and it is
-  // deliberate rather than an oversight.
+  // Is the drop bigger than relabelling the same runs would produce?
   //
-  // The margin is the baseline spread's WIDTH, not its lowest per-run rate.
-  // Per-run finding counts here are small enough that a run can return one
-  // finding; if it is not speculative, a floor-based rule pins to 0% and
-  // nothing can ever ship however good the candidate is.
-  const bandLo = base.specRates.length ? Math.min(...base.specRates) : 0
-  const bandHi = base.specRates.length ? Math.max(...base.specRates) : 0
-  const margin = bandHi - bandLo
+  // The previous rule compared a POOLED improvement against a SINGLE run's
+  // spread width and called the asymmetry deliberate conservatism. It is not
+  // conservatism, it is unsatisfiable: a pooled mean over N runs varies far
+  // less than one run does, so whenever the baseline's pooled rate is smaller
+  // than its own per-run spread, the largest achievable improvement is below
+  // the margin and NO candidate can pass — including one that scores a perfect
+  // zero. Both measured experiments hit exactly that (#807 target 1: pooled
+  // 8%, spread width 25%, candidate reached 0% and still failed).
+  //
+  // A permutation test compares like with like and needs no distributional
+  // assumption, which matters because rates built from 1–6 findings per run are
+  // nowhere near normal.
   const improvement = base.speculativeRate - cand.speculativeRate
-  const outsideBand = improvement > margin + BAND_EPSILON
-  // outsideBand already subsumes specDown (margin is never negative, so
-  // improvement > margin implies improvement > 0). Both are kept because the
-  // rubric states them as separate conditions and the report prints them
-  // separately — but they are not independent checks.
+  const perm = permutationTest(base.specRates, cand.specRates)
+  const outsideBand = perm.p < PERMUTATION_ALPHA
+  // No longer subsumed: the test is two-sided in construction and a tiny drop
+  // can be significant, so the direction has to be checked on its own.
   const specDown = cand.speculativeRate < base.speculativeRate
   // The RATE alone is gameable: adding defects, hygiene findings or artifacts
   // enlarges the denominator and lowers speculative_rate while the number of
@@ -1990,7 +2078,7 @@ function evaluateVerdict(base, cand, opts = {}) {
     && defectsHeld && lostSites.length === 0 && outsideBand
 
   return {
-    blockers, bandLo, bandHi, margin, improvement,
+    blockers, improvement, perm,
     outsideBand, specDown, countDown, lowValueDown, defectsHeld, lostSites, ship,
   }
 }
@@ -2270,8 +2358,10 @@ function report(args) {
     + `${v.countDown ? 'down' : 'NOT down — the rate fell only because the denominator grew'}`)
   console.log(`low-value count:   ${base.lowValues} → ${cand.lowValues}  `
     + `${v.lowValueDown ? 'down' : 'NOT down — speculative findings were traded for other low-value ones'}`)
-  console.log(`improvement ${pct(v.improvement)} vs baseline per-run spread ${pct(v.bandLo)}–${pct(v.bandHi)} `
-    + `(width ${pct(v.margin)}) — ${v.outsideBand ? 'clears the noise band' : 'INSIDE the noise band'}`)
+  console.log(`improvement ${pct(v.improvement)} — permutation p=${v.perm.p.toFixed(3)} over `
+    + `${v.perm.splits.toLocaleString()} ${v.perm.exact ? 'exact splits' : 'sampled splits'} `
+    + `(alpha ${PERMUTATION_ALPHA}) — `
+    + `${v.outsideBand ? 'distinguishable from relabelling' : 'INSIDE the noise band'}`)
   console.log(`defect count:     ${base.defects} → ${cand.defects}  ${defectVerdict}`)
   console.log(`baseline defects per run: ${range(base.defectsPerRun)} `
     + `(candidate is ${dropPerRun >= 0 ? '-' : '+'}${Math.abs(dropPerRun).toFixed(2)} per run)`)
@@ -2528,27 +2618,34 @@ function selftest() {
   // Drive the REAL decision function, not a copy of its arithmetic.
   const cond = (over = {}) => ({
     label: 'x', runs: MIN_RUNS, degradedRuns: 0, coverages: ['a,b'], hasFindings: true,
-    emptyRuns: 0, specRates: [0.4, 0.5], speculativeRate: 0.45, speculatives: 9,
+    emptyRuns: 0, specRates: [0.4, 0.5, 0.4, 0.5, 0.4, 0.5], speculativeRate: 0.45, speculatives: 9,
     lowValues: 12, defects: 10,
     defectClusters: [{ file: 'src/a.ts', tokens: ['null', 'pointer', 'deref', 'guard'], runs: 3 }],
     defectTokensByFile: { 'src/a.ts': [['null', 'pointer', 'deref', 'guard']] }, ...over,
   })
 
-  // Every combination of the three decision inputs, so the AND cannot silently
-  // become an OR. specDown+outsideBand are driven together via the rate.
+  // Every combination of the decision inputs, so the AND cannot silently become
+  // an OR. Per-run rates move WITH the pooled rate, since the permutation test
+  // reads the per-run vectors: a fixture whose pooled rate dropped while its
+  // per-run rates stayed put would be incoherent data, not a test.
   for (const specRate of [0.2, 0.44, 0.5]) {
     for (const defects of [10, 9]) {
       const base = cond()
-      const cand = cond({ speculativeRate: specRate, defects, speculatives: 5, lowValues: 6 })
+      const cand = cond({
+        speculativeRate: specRate,
+        specRates: Array(6).fill(specRate),
+        defects,
+        speculatives: 5,
+        lowValues: 6,
+      })
       const v = evaluateVerdict(base, cand)
-      const expected = specRate < 0.45 && (0.45 - specRate) > 0.1 && defects >= 10
+      // 0.2 separates cleanly from the baseline's 0.4/0.5 runs (p≈0.001);
+      // 0.44 sits inside them (p≈0.354); 0.5 is no improvement at all.
+      const expected = specRate === 0.2 && defects >= 10
       assert.equal(v.ship, expected, `verdict wrong for rate ${specRate}, defects ${defects}`)
     }
   }
 
-  // The noise band uses the baseline spread's WIDTH. A floor-based rule
-  // degenerates: one baseline run with no speculative finding pins it to 0%
-  // and nothing can ever ship.
   // A rate that fell only because the denominator grew must not ship.
   assert.equal(evaluateVerdict(cond(), cond({ speculativeRate: 0.1, speculatives: 9, lowValues: 6 })).ship, false,
     'the speculative COUNT must fall, not just the rate')
@@ -2556,22 +2653,54 @@ function selftest() {
   assert.equal(evaluateVerdict(cond(), cond({ speculativeRate: 0.1, speculatives: 5, lowValues: 12 })).ship, false,
     'the low-value COUNT must fall too')
 
-  assert.equal(evaluateVerdict(cond({ specRates: [0.0, 0.5], speculativeRate: 0.4 }),
-    cond({ speculativeRate: 0.3, speculatives: 5, lowValues: 6 })).ship,
-  false, 'a 10pt gain must not clear a 50pt spread')
-  assert.equal(evaluateVerdict(cond({ specRates: [0.0, 0.0], speculativeRate: 0.3 }),
-    cond({ speculativeRate: 0.1, speculatives: 5, lowValues: 6 })).ship,
-  true, 'a zero-width spread must not block a real gain')
+  // THE BUG THE OLD RULE HAD. Baseline pooled rate 8% with a per-run spread of
+  // 25% — the shape #807 target 1 actually produced. Under the old
+  // width-based margin the largest achievable improvement (8pt, candidate at a
+  // perfect zero) was below the 25pt margin, so nothing could EVER ship. The
+  // test must now reach a verdict on the evidence instead of refusing by
+  // construction: six runs at this separation are simply not enough to
+  // distinguish, which is a finding about power, not an arithmetic dead end.
+  const realShape = evaluateVerdict(
+    cond({ specRates: [0, 0.2, 0.25, 0, 0, 0], speculativeRate: 0.08, speculatives: 2 }),
+    cond({
+      specRates: [0, 0, 0, 0, 0, 0], speculativeRate: 0, speculatives: 0, lowValues: 6,
+    }),
+  )
+  assert.ok(realShape.perm.p > 0 && realShape.perm.p <= 1, 'a p-value must be produced at all')
+  assert.equal(realShape.perm.exact, true, 'N=6 must be decided exhaustively')
+  assert.equal(realShape.perm.splits, 924, 'C(12,6) = 924 splits at the rubric floor')
+
+  // Clear separation is significant; overlap is not.
+  const sixBase = { specRates: [0.4, 0.5, 0.4, 0.5, 0.4, 0.5], speculativeRate: 0.45 }
+  assert.equal(evaluateVerdict(cond(sixBase), cond({
+    ...sixBase, specRates: Array(6).fill(0.2), speculativeRate: 0.2, speculatives: 5, lowValues: 6,
+  })).ship, true, 'cleanly separated per-run rates must be able to ship')
+  assert.equal(evaluateVerdict(cond(sixBase), cond({
+    ...sixBase, specRates: Array(6).fill(0.44), speculativeRate: 0.44, speculatives: 5, lowValues: 6,
+  })).ship, false, 'a gain buried inside the baseline runs must not ship')
+  // Identical arms are p=1 by construction, never a pass.
+  assert.equal(
+    permutationTest(Array(6).fill(0.3), Array(6).fill(0.3)).p, 1,
+    'identical arms cannot be distinguishable',
+  )
+  // Degenerate input fails CLOSED rather than dividing by zero into a pass.
+  assert.equal(permutationTest([], []).p, 1)
+  assert.equal(permutationTest([0.1, 0.2], [0.1]).p, 1, 'unequal arms must not yield a pass')
 
   // Each precondition blocks on its own.
-  const good = { speculativeRate: 0.1, speculatives: 5, lowValues: 6 }
+  // Carries per-run rates too: the permutation test reads the vectors, so a
+  // candidate whose pooled rate dropped while its per-run rates matched the
+  // baseline's would be incoherent data rather than a good outcome.
+  const good = {
+    speculativeRate: 0.1, specRates: Array(6).fill(0.1), speculatives: 5, lowValues: 6,
+  }
 
   // An exact tie must not ship: float subtraction can make equal values compare
   // as greater, and a ship rule should fail closed.
   assert.equal(evaluateVerdict(
-    cond({ specRates: [0.4, 0.5], speculativeRate: 0.5 }),
-    cond({ ...good, speculativeRate: 0.4 }),
-  ).ship, false, 'an improvement exactly equal to the margin must not clear it')
+    cond({ specRates: Array(6).fill(0.5), speculativeRate: 0.5 }),
+    cond({ ...good, specRates: Array(6).fill(0.5), speculativeRate: 0.5 }),
+  ).ship, false, 'no separation at all must not clear the test')
 
 
   // A candidate that stops finding a defect the baseline found repeatedly must
