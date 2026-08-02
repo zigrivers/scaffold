@@ -61,6 +61,12 @@ describe('medianOf', () => {
   it('handles a single sample', () => {
     expect(medianOf([7])).toBe(7)
   })
+
+  it('throws on no samples rather than returning NaN', () => {
+    // NaN would fail every `toBeLessThan` in a way that looks like a real
+    // budget breach, which is a worse failure than an explicit throw.
+    expect(() => medianOf([])).toThrow(/no samples/)
+  })
 })
 
 describe('perOpStatsMs', () => {

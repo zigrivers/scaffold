@@ -67,6 +67,9 @@ export function minSamplesForP95(): number {
 
 /** True median: the average of the two middle samples when `n` is even. */
 export function medianOf(sorted: readonly number[]): number {
+  // Without this an empty array reads `sorted[-1]` and returns NaN, and NaN
+  // fails every `toBeLessThan` silently-looking way. Exported, so guard it.
+  if (sorted.length === 0) throw new Error('medianOf: no samples')
   const mid = sorted.length >> 1
   return sorted.length % 2 === 1 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2
 }
@@ -82,6 +85,20 @@ export interface PerOpStats {
   summary: string
 }
 
+/**
+ * `samples` defaults to 41, one above the 40 `minSamplesForP95` reports.
+ *
+ * Not an off-by-one. An odd count makes the median an actual observed sample
+ * rather than the average of two, and it keeps the default off the exact
+ * boundary of the guard, so a future change to MIN_SAMPLES_ABOVE_P95 surfaces
+ * as a failing test rather than as every caller landing on the new minimum.
+ *
+ * `batch` and `samples` are also the values every budget in budgets.ts was
+ * MEASURED against. Retuning either changes the distribution the budgets
+ * describe — most of all for state writes, where batch x samples is the total
+ * fsync count — so a change here means re-deriving those numbers from CI, not
+ * just re-running the suite.
+ */
 export function perOpStatsMs(
   op: () => void,
   { batch = 100, samples = 41, warmup = batch, digits = 4 } = {},
