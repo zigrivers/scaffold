@@ -2047,6 +2047,11 @@ function floorClearsAlpha(p) {
  */
 function permutationFloor(baseRates, candRates) {
   const n = baseRates.length
+  // Degenerate input: p = 1 reads as "maximally undecidable", which is the
+  // fail-closed direction but is a sentinel rather than a measurement. It is
+  // unreachable from `evaluateVerdict` — empty and unequal arms are both
+  // blockers there, and a blocker keeps `noVerdict` false regardless — so no
+  // caller can turn a malformed collection into a withheld verdict.
   if (n === 0 || candRates.length !== n) {
     return { p: 1, signalRuns: 0, ties: 0, pooled: 0, requiredN: null }
   }
@@ -2264,10 +2269,14 @@ function evaluateVerdict(base, cand, opts = {}) {
   // go and collect.
   const otherRulesFailed = !specDown || !countDown || !lowValueDown || !defectsHeld
     || lostSites.length > 0
-  // `blockers` is in here because a blocker is its own decidable reason not to
-  // ship. `report` returns before the verdict line when any blocker is set, so
-  // this cannot change what is printed today — it keeps the field honest for
-  // any other reader of evaluateVerdict, which is the only way this stays true
+  // `noVerdict` also requires no blockers — a blocker is its own decidable
+  // reason not to ship, so an experiment carrying one is not the "nothing but
+  // rule 4 stood in the way" case. It is a separate conjunct rather than part
+  // of `otherRulesFailed`, which names only the five rubric conditions.
+  //
+  // `report` returns before the verdict line whenever a blocker is set, so this
+  // cannot change what is printed today. It keeps the field honest for any
+  // other reader of evaluateVerdict, which is the only thing that keeps it true
   // if that early return ever moves.
   const noVerdict = undecidable && !otherRulesFailed && blockers.length === 0
 
