@@ -35,11 +35,23 @@ export default defineConfig({
     // but running the suite on a busy machine times out at 5s, and the failure
     // reads as "Test timed out", not as anything about performance.
     //
-    // 30s is sized from the worst CI run measured for #813: 0.44ms/op median
-    // over 4200 writes is ~1.8s, and even a runner spending most samples near
-    // that run's 5.16ms p95 lands around 6s. It is a hang detector, not a
-    // budget — the budgets in tests/performance/budgets.ts are the only thing
-    // here making a statement about speed.
-    testTimeout: 30_000,
+    // 60s is sized so the worst runner #813 measured cannot trip it. Total wall
+    // time is driven by the MEAN per-op cost, which those runs did not record,
+    // so the number comes from a bound that needs no mean: 41 samples x 100
+    // writes plus warmup is 4200 ops, and if EVERY one of them cost what the
+    // worst single sample cost on the worst run (11.6ms/op) the case takes
+    // ~49s. For scale, the same arithmetic at that run's median is ~1.8s, and
+    // idle on a developer Mac it measures 783ms.
+    //
+    // A tighter 30s was the first attempt, justified with "a runner near the
+    // 5.16ms p95 lands around 6s". That is wrong twice over — 5.16ms x 4200 is
+    // 21.7s, and a p95 is the top 5% rather than a stand-in for the mean. Both
+    // review channels caught it. The corrected figure is above.
+    //
+    // This is a hang detector, not a budget. The budgets in
+    // tests/performance/budgets.ts make the only statements here about speed,
+    // and a timeout that fires on a legitimately slow runner would report
+    // "Test timed out" — which is exactly the misleading failure this replaced.
+    testTimeout: 60_000,
   },
 })
