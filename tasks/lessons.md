@@ -556,3 +556,24 @@ harness printed `revert`, which reads as "weighed and found wanting". Withhold
 the verdict when the deciding rule could not be decided, but only when it is the
 ONLY thing standing in the way: a revert resting on evidence that needs no
 statistical power is still a real verdict.
+
+**A test's timeout is part of its configuration, and raising sample counts
+changes it.** #813 took the state-write benchmark from ~1600 writes to ~4200
+without touching vitest's 5s default. Idle that is 783ms and passes, so five CI
+runs and a merge all stayed green — CI runs the perf suite alone. Run it beside
+`make check-all` and it fails with "Test timed out", a message that says nothing
+about performance. Review had flagged `batch x samples` as an expensive fsync
+loop; the answer given was about I/O pressure only, and missed that the same
+arithmetic blows the timeout.
+
+**Size a timeout with a bound that needs no mean.** The first attempt justified
+30s with "a runner near the 5.16ms p95 lands around 6s" — wrong twice: 5.16ms
+over 4200 ops is 21.7s, and a p95 is the top 5%, not a stand-in for the mean
+that actually drives total wall time. Both review channels caught it. The
+defensible bound assumes every op costs what the WORST single sample cost
+(11.6ms/op -> ~49s), which needs no distribution at all.
+
+**Verify a merge by running the suite under load, not just by reading CI green.**
+CI is the quietest environment the code will ever see. The only reason this
+defect was caught before it started flaking for real is that the perf suite was
+run on `main` while another full gate was running beside it.
