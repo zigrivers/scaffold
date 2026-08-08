@@ -15,7 +15,14 @@
 #   * `bd update <id> --claim` is an actor-keyed compare-and-set
 #     (different actor refused, same actor idempotent) — the collision guard.
 #   * `--assignee ""` clears the assignee (the release).
-#   * single-command cooldown-release `--assignee "" --defer +1h` defers + hides.
+#   * single-command cooldown-release `--assignee "" --defer <absolute UTC>`
+#     defers + hides, AND the stored defer_until is actually in the future
+#     (bd ≤1.1.2 serializes RELATIVE offsets as local wall-clock stamped Z —
+#     gastownhall/beads#5233 — which is why the protocol computes an absolute
+#     instant).
+#   * the wake primitive restores a deferred bead to `bd ready` (bd itself
+#     never wakes one — gastownhall/beads#5289 — the lapsed-defer sweeper
+#     relies on this restore round-tripping).
 #   * `lease_until` metadata set + clear (the TTL lease).
 #   * `bd ready --claim` claims a normal ready bead (the generic path).
 set -euo pipefail
@@ -68,15 +75,62 @@ bd update "$A" --status open --assignee "" >/dev/null 2>&1 || fail "release upda
 [ -z "$(bd show "$A" --json 2>/dev/null | extract assignee)" ] || fail '--assignee "" must clear the assignee'
 ok 'release (--assignee "") clears the assignee'
 
-# 3) Single-command cooldown-release: --assignee "" --defer +1h (NOT --status open).
+# 3) Single-command cooldown-release with an ABSOLUTE UTC instant (NOT --status
+#    open, and NOT a relative offset — bd ≤1.1.2 stamps those in local wall time).
+to_epoch() {  # same tolerance as the sweeper: fractional seconds stripped, GNU then BSD date
+  local ts="${1:-}" e=""
+  [ -n "$ts" ] || { printf ''; return 0; }
+  ts="$(printf '%s' "$ts" | sed -E 's/\.[0-9]+//')"
+  e="$(date -u -d "$ts" +%s 2>/dev/null || true)"
+  [ -n "$e" ] || e="$(date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$ts" +%s 2>/dev/null || true)"
+  printf '%s' "$e"
+}
 B="$(mkbead 'cooldown')"
 [ -n "$B" ] || fail "could not create the cooldown test bead (bd create --json / id parse)"
 bd update "$B" --claim --actor alpha-agent >/dev/null 2>&1 || fail "claim B failed"
-bd update "$B" --assignee "" --defer +1h --unset-metadata lease_until >/dev/null 2>&1 || fail "cooldown-release failed"
+UNTIL_TS="$(date -u -v+1H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%SZ)"
+bd update "$B" --assignee "" --defer "$UNTIL_TS" --unset-metadata lease_until >/dev/null 2>&1 || fail "cooldown-release failed"
 if bd ready --json 2>/dev/null | grep -qF -- "$B"; then
   fail "a deferred bead must be HIDDEN from bd ready (did --status open cancel the defer?)"
 fi
 ok 'single-command cooldown-release defers + clears + hides from bd ready'
+STORED="$(bd show "$B" --json 2>/dev/null | extract defer_until)"
+[ -n "$STORED" ] || fail "cooldown-release did not store a defer_until"
+STORED_EPOCH="$(to_epoch "$STORED")"
+NOW_EPOCH="$(date -u +%s)"
+[ -n "$STORED_EPOCH" ] || fail "stored defer_until is unparseable: $STORED"
+[ "$STORED_EPOCH" -gt "$NOW_EPOCH" ] || fail "stored defer_until ($STORED) is in the PAST — bd serialized the deferral wrong (gastownhall/beads#5233); the sweeper's grace window is the only net"
+ok "stored defer_until is in the future ($STORED)"
+
+# 3b) Wake primitive: the exact restore the lapsed-defer sweeper performs must
+#     return the bead to bd ready — bd never does this on its own (#5289).
+#     NOTE: `--status open` + `--defer ""` deliberately CANCELS the deferral —
+#     the intended effect of a wake. The same combination is forbidden in the
+#     cooldown-release (work-beads 2.1c), where the defer must SURVIVE the
+#     release; these are opposite operations, not a contradiction.
+bd update "$B" --status open --assignee "" --defer "" --unset-metadata lease_until >/dev/null 2>&1 || fail "wake restore (status open + clear defer + clear lease) failed"
+bd ready --json 2>/dev/null | grep -qF -- "$B" || fail "a woken bead must REAPPEAR in bd ready (restore round-trip broken)"
+ok 'wake restore returns a deferred bead to bd ready'
+
+# 3c) Append-only notes: the protocol forbids `--notes` (it REPLACES the field)
+#     and relies on `bd note` appending — verify the primitive exists and appends
+#     (jq-gated: the fallback extractor collapses whitespace).
+if command -v jq >/dev/null 2>&1; then
+  bd note "$B" "first probe note" >/dev/null 2>&1 || fail "bd note failed — the append-only notes primitive is missing"
+  bd note "$B" "second probe note" >/dev/null 2>&1 || fail "second bd note failed"
+  NOTES_ALL="$(bd show "$B" --json 2>/dev/null | jq -r '(if type=="array" then .[0] else . end) | (.notes // "")')"
+  case "$NOTES_ALL" in
+    *"first probe note"*) : ;;
+    *) fail "bd note did not APPEND — the first note was lost (did bd note start replacing?)" ;;
+  esac
+  case "$NOTES_ALL" in
+    *"second probe note"*) : ;;
+    *) fail "bd note did not record the second note" ;;
+  esac
+  ok 'bd note appends (both notes survive)'
+else
+  echo "  skip bd-note append check (jq not installed)"
+fi
 
 # 4) Lease metadata lifecycle (jq-gated — the reaper needs to read metadata.lease_until).
 if command -v jq >/dev/null 2>&1; then
@@ -101,7 +155,10 @@ CLAIMED="$(bd ready --claim --actor gamma-agent --json 2>/dev/null | extract id)
 [ -n "$CLAIMED" ] || fail "bd ready --claim returned nothing on a non-empty ready queue"
 ok "bd ready --claim claims a normal ready bead (generic path)"
 
-# Note: `bd --defer` reads the bare unit `m` as MONTHS (+30m → +30 months); the
-# protocol always uses +1h / +6h / +1d. This is a documented caution, not asserted.
+# Note: the protocol never passes RELATIVE offsets to `bd --defer` — bd ≤1.1.2
+# serializes them as local wall-clock stamped Z (gastownhall/beads#5233), and it
+# reads the bare unit `m` as MONTHS (+30m → +30 months). Always compute an
+# absolute UTC instant as check 3 does. Documented caution, partially asserted
+# above (the stored-in-the-future check).
 
 echo "PASS: bd supports the concurrency-hardening claim protocol (${pass} checks)."

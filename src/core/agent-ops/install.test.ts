@@ -325,3 +325,11 @@ describe('buildTemplateVars extensions', () => {
     expect(vars.DEFAULT_BRANCH).toBe('main')
   })
 })
+
+describe('lapsed-defer sweeper (git component)', () => {
+  it('registers the file-map entry', () => {
+    expect(AGENT_OPS_FILE_MAP['git/reap-lapsed-defers.sh.tmpl']).toEqual({
+      dest: 'scripts/reap-lapsed-defers.sh', component: 'git', executable: true,
+    })
+  })
+})

@@ -335,6 +335,25 @@ reference content — it does not touch (and is never overwritten by) the
    `bd bootstrap` — safe here ONLY because step 1 pushed everything. Never
    migrate independently on two clones. bd's migrate gate (on by default
    since v1.1.0) refuses unsafe cases — a refusal is a stop sign.
+8. **Deferred is a cooldown, not a graveyard** — verbatim rules:
+   - bd (through 1.1.2) never returns a deferred bead to `bd ready` when its
+     `defer_until` passes (gastownhall/beads#5289) — the status stays
+     `deferred` forever and `bd undefer` is the only manual exit. Restore is
+     the shipped sweeper `scripts/reap-lapsed-defers.sh` (agent-ops git
+     component): `make prune-merged` auto-applies it after every merge sweep,
+     and the `work-beads` skill runs it report-only at orient — lapsed
+     cooldowns can never silently rebuild into deferred debt.
+   - Always defer to an ABSOLUTE UTC instant
+     (`until="$(date -u -v+1H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%SZ)"`)
+     — bd serializes RELATIVE offsets as local wall-clock stamped `Z`
+     (gastownhall/beads#5233), so west of UTC `--defer +1h` lands in the past
+     at write time (and a bare `m` unit reads as MONTHS).
+   - Deliberate indefinite parking is a `Wait:` (or `external-wait`) note
+     naming the exit condition — the sweeper holds those — or simply close
+     the bead. A defer with no checkable reason is debt, not parking.
+   - File a tracking bead to retire the sweeper and the absolute-instant
+     convention when a bd release fixes both upstream bugs — re-verify both
+     fixes in a scratch DB before dropping either workaround.
 
 ## Conditional Evaluation
 Enable when: project uses Beads task tracking methodology (user selects Beads during
@@ -368,7 +387,8 @@ in-place preserving project-specific customizations.
   reconfiguration after workflow changes, docs/beads-workflow.md is
   missing or still documents the retired bead-ID commit-prefix convention
   instead of the D7 body-reference form, or docs/beads-workflow.md is missing
-  the Durability & the bootstrap trap runbook or the Upgrades & migration section
+  the Durability & the bootstrap trap runbook, the Upgrades & migration section,
+  or is missing the deferred-cooldown (lapsed-defer sweeper) section
 - **Conflict resolution**: if CLAUDE.md Beads section was manually customized,
   merge new content around existing customizations rather than replacing;
   the same rule applies to docs/beads-workflow.md

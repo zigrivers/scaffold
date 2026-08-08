@@ -91,6 +91,7 @@ mode** and list your own live claims:
 
 ```bash
 scripts/reap-stale-claims.sh                              # REPORT ONLY — never releases
+scripts/reap-lapsed-defers.sh                             # REPORT ONLY — lapsed cooldowns rotting out of bd ready (skip if absent)
 bd list --status in_progress --assignee "$BEADS_ACTOR"   # your own crashed-session claims to resume
 ```
 
@@ -146,6 +147,15 @@ tie-breaker.")
 Maintain a per-pass SKIP-SET of bead IDs you have already lost-raced or
 cooldown-released this invocation, and skip them when you re-rank.
 
+**`Owner:` is NOT an assignment — never skip or park a bead because of it.** In
+bd, `Owner` is the immutable identity of whoever CREATED the bead, so it goes on
+naming a long-departed agent forever. Only `Assignee` + `in_progress` means
+someone holds it, and the atomic claim at 2.1 is what detects that. Beware that
+some bd builds have omitted the assignee field from `bd list --json` output —
+if a listing shows no assignee, confirm with `bd show <id>` (which does print
+it) before concluding a bead is unheld; `bd ready --unassigned` and
+`bd list --assignee <name>` are the reliable holder queries.
+
 Cheap pre-claim exclusions (knowable from the queue view — skip before claiming):
 - the merge-slot infrastructure bead: the project's `<prefix>-merge-slot` bead
   (or anything labeled `gt:slot`) is the merge LOCK, not work — it sits open at
@@ -194,6 +204,19 @@ a. **Claim** the ranked candidate: `bd update <id> --claim` — one atomic
      `scaffold observe event claim --task <id>` — feature-detect, skip silently.
 
 b. **Validation gates** (they read shared state, so they run AFTER the claim):
+   - **stale-park re-check — run this FIRST; it is cheap and usually clears the
+     bead.** If the bead carries a park/cooldown/`BLOCKED` note, RESOLVE every
+     artifact that note names before you honor it: `gh pr view <n> --json state`
+     for each cited PR, `bd show <id>` for each cited bead, `git worktree list`
+     plus `gh pr list` for a cited peer worktree or branch. A park note is
+     evidence about the moment it was written, not a standing verdict — once
+     every cited PR is MERGED/CLOSED and every cited bead is closed, the park is
+     STALE: append a dated unpark note recording what you verified, and proceed.
+     **Never re-park a bead by restating an earlier note you did not
+     re-verify** — that ratchet is what silently freezes a backlog, because each
+     pass adds a "recheck: still parked" line that reads as fresh evidence to the
+     next agent. A merged PR is not a conflict; a closed bead is not a blocker;
+     a branch left behind by a squash-merge is not live work.
    - duplicate-work scan: `scripts/setup-agent-worktree.sh --preflight-only --task "<bead title>"`
    - open-PR-surface conflict: does any open/draft PR touch the same module,
      migration sequence, or shared single-writer code? (docs/git-workflow.md)
@@ -206,12 +229,58 @@ b. **Validation gates** (they read shared state, so they run AFTER the claim):
 c. **On a gate REJECT** (you hold it, but it is a dup/conflict — a PERSISTENT
    condition that would reject the next agent too), cooldown-release in ONE
    command so the whole fleet backs off (prevents a claim→reject→release
-   busy-loop): `bd update <id> --assignee "" --defer +1h --unset-metadata lease_until`.
+   busy-loop).
+
+   **Two hard rules before you write the release:**
+
+   1. **Use `bd note` / `--append-notes`, NEVER `bd update --notes`.** `--notes`
+      REPLACES the field — one batch release using it has destroyed the
+      accumulated investigation history on 15 beads in a single command
+      (recoverable only via `bd history <id> --json`). Notes are append-only in
+      practice; treat `--notes` as reserved for a bead you just created.
+   2. **The defer reason MUST name something a later agent can re-resolve** — a
+      PR number, a bead id, a branch, a file path, or a command that fails.
+      Write the re-check condition explicitly ("resume when #1306 merges"). A
+      reason that cannot be checked cannot be cleared, so the bead never comes
+      back. **Banned as standalone reasons:** "not autonomously shippable this
+      session", "multi-session product/surface", "soft-park", "formalized out
+      of ready". Those describe YOUR capacity right now, not the bead's state.
+      If the bead is genuinely too big, **split it** (children under
+      `--parent`); if it needs a human decision, say which decision and who
+      owns it.
+
+   Never mass-defer to drain `bd ready`. An empty queue is not the goal; a
+   queue whose every entry has a checkable blocker is. If you are deferring
+   more beads than you worked, stop and report instead.
+
+   Then append a dated cooldown-release note naming the blocker, compute an
+   ABSOLUTE UTC instant, and release:
+
+   ```bash
+   bd note <id> "cooldown-release ($BEADS_ACTOR): <what rejected it — PR/bead/surface>"
+   until_ts="$(date -u -v+1H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%SZ)"
+   bd update <id> --assignee "" --defer "$until_ts" --unset-metadata lease_until
+   ```
+
    That clears ownership + the lease AND leaves the bead `deferred` (out of
-   `bd ready`) until the cooldown lapses, when it reappears unassigned. Do NOT
-   add `--status open` — it cancels the defer. (Never write `+30m`; `bd` reads
-   `m` as MONTHS → 2029. Use `+1h`/`+6h`/`+1d`.) Add the ID to the SKIP-SET and
-   take the next candidate.
+   `bd ready`). **bd itself NEVER wakes it** (through bd 1.1.2 —
+   gastownhall/beads#5289): restore is the shipped sweeper —
+   `make prune-merged` auto-applies `scripts/reap-lapsed-defers.sh` after every
+   merge sweep, and report mode runs at orient — or a manual `bd undefer`. Do
+   NOT add `--status open` to the release — it cancels the defer you just set
+   (that cancellation is exactly what the sweeper's wake does later, on
+   purpose). Do NOT pass a RELATIVE
+   offset (`+1h`): bd (≤1.1.2) serializes it as local wall-clock stamped `Z`
+   (gastownhall/beads#5233), so west of UTC the cooldown lands in the PAST (and
+   `+30m` reads as 30 MONTHS). Add the ID to the SKIP-SET and take the next
+   candidate.
+
+   **Escalate instead of cycling:** if the bead ALREADY carries 2+ prior
+   cooldown-release notes for the same cause, the condition is not going to
+   clear on its own — do NOT re-defer. Append a `Wait:` note naming exactly
+   what must change (`Wait: resolve duplicate against <id> — human triage`);
+   the sweeper holds `Wait:` beads, so it stays parked deliberately. Report it
+   in the Step 3 slots for human triage.
 
 d. **All gates pass → this is your bead.** Go to worktree setup (2.2).
 
@@ -398,7 +467,13 @@ If the batch ran long and `launchpad` is installed: `launchpad notify "<summary>
 | Claim without a per-agent `BEADS_ACTOR` | Same-actor claims are idempotent — two agents sharing the default identity both "own" the bead |
 | Retry a lost claim | Normal traffic at high parallelism — take the next candidate |
 | Validate a bead before claiming it | Claim first — validation reads shared state; holding the claim hides the bead from peers while you decide |
-| Release a rejected bead straight to `--status open` | Persistent dup/conflict → the fleet re-claims/re-rejects it forever; cooldown-release `bd update <id> --assignee "" --defer +1h` instead |
+| Release a rejected bead straight to `--status open` | Persistent dup/conflict → the fleet re-claims/re-rejects it forever; cooldown-release with an ABSOLUTE UTC `--defer "$until_ts"` instead (see 2.1c) |
+| Skip or park a bead because its `Owner` is another agent | `Owner` is the immutable CREATOR, not an assignee — it names a departed agent forever. Only `Assignee` + `in_progress` holds a bead (Step 1) |
+| Honor an existing park note without re-resolving what it cites | Park notes go stale silently; a "recheck: still parked" line you did not verify is the ratchet that freezes a backlog (2.1b) |
+| `bd update <id> --notes "..."` on an existing bead | `--notes` REPLACES — it can destroy a bead's whole investigation history in one command. Use `bd note` / `--append-notes` (2.1c) |
+| Defer with a reason like "not autonomously shippable this session" | That is your capacity, not the bead's state — unfalsifiable, so it can never be cleared. Name a PR/bead/branch/command and the re-check condition (2.1c) |
+| Mass-defer beads to empty `bd ready` | An empty queue is not the goal. Deferring more beads than you worked is a stop-and-report signal, not a session outcome (2.1c) |
+| Cooldown-release the same bead a third time | 2+ prior cooldown notes for one cause = it will not clear itself — `Wait:` note + human triage instead of an hourly claim→reject cycle (2.1c) |
 | Pre-filter the queue to your capability slice | Rank the WHOLE queue; capability fit is a within-tier tie-break only — an out-of-slice P0 beats an in-slice P2 |
 | Reap/release another agent's stranded bead by hand | Surface it in the reaper report; releasing a claim is an `--apply`/operator decision |
 | Bootstrap/reset a populated `.beads` DB | Wipes unpushed beads — fresh clones only; push first (`bd dolt commit && bd dolt push`) |

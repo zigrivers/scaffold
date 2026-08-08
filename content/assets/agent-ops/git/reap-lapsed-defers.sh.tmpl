@@ -1,0 +1,338 @@
+#!/usr/bin/env bash
+# {{PROJECT_NAME}} — lapsed-defer sweeper for the Beads work queue.
+# Installed by `scaffold agent-ops install --component git`.
+# Companion to reap-stale-claims.sh (which handles stale in_progress claims;
+# this script handles the deferred side).
+#
+# bd (through 1.1.2) never returns a deferred bead to `bd ready` when its
+# defer_until passes — `bd update --help` says "hidden from bd ready until
+# then", but the status stays `deferred` forever and `bd undefer` is the only
+# exit (gastownhall/beads#5289). Cooldown-released beads therefore rot
+# invisibly. This sweep surfaces (and, with --apply, restores) deferrals whose
+# timer has lapsed. `make prune-merged` runs the --apply sweep automatically
+# after every merge, so the debt can never silently rebuild.
+#
+#   scripts/reap-lapsed-defers.sh                # REPORT ONLY (default) — never mutates
+#   scripts/reap-lapsed-defers.sh --apply        # guarded restore of lapsed deferrals
+#
+# A lapsed timer alone is weak evidence the wait is over: bd 1.1.2 stamps
+# relative deferrals hours in the past to begin with (gastownhall/beads#5233),
+# and many parks name an exit condition the clock knows nothing about. So a
+# lapsed candidate is HELD, not restored, when any of these still holds:
+#   * an open/draft PR references the bead id (its own work is in flight);
+#   * its notes cite a PR number that is still open (the file-conflict park:
+#     "Draft PR #N modifies these exact files");
+#   * its external_ref names a PR (`gh-pr-N` or a GitHub pull URL) still open;
+#   * a `blocks` dependency target is not closed;
+#   * its notes carry an explicit external-wait marker. The marker convention
+#     is case-sensitive and literal: a note line (or word) starting `Wait:`,
+#     or the exact substring `external-wait`.
+# A deferred bead with NO defer_until is always held: there is no lapse to
+# reason from.
+#
+# When a bd release fixes both upstream bugs (#5289 auto-wake, #5233 UTC
+# serialization), file a bead to retire this sweeper and the absolute-instant
+# defer convention — re-verify both fixes in a scratch DB first.
+#
+# Safety: mirrors the reaper. The restore is a guarded write — --apply
+# re-reads the bead immediately before restoring and ABORTS if it is no
+# longer deferred or its updated_at moved since the scan.
+set -euo pipefail
+
+APPLY=0
+# Restore only defers lapsed by more than this grace margin (seconds), so an
+# active +1h cooldown another agent just stamped is never swept mid-window.
+GRACE_SECONDS="${SWEEP_GRACE_SECONDS:-3600}"
+# [HOST] The PR-lister is pluggable so a project on a non-GitHub forge can swap
+# it. It MUST emit a JSON array with (at least) number, title, headRefName, body.
+PR_LIST_CMD="${REAP_PR_LIST_CMD:-gh pr list --state open --limit 500 --json number,title,headRefName,body,isDraft}"
+# Clock is injectable so tests can pin "now".
+NOW="${REAP_NOW:-$(date +%s)}"
+
+usage() {
+  sed -n '2,/^set -/p' "$0" | sed 's/^# \{0,1\}//; /^set -/d'
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --apply) APPLY=1; shift ;;
+    --dry-run) APPLY=0; shift ;;            # explicit alias of the default
+    --grace) GRACE_SECONDS="${2:?}"; shift 2 ;;
+    --pr-lister) PR_LIST_CMD="${2:?}"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) printf 'sweep: unknown argument: %s\n' "$1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+# Report mode tolerates a missing toolchain (agents run it during orient in
+# checkouts that may not be beads workspaces); --apply is an explicit request
+# to mutate, so a missing dependency there is INCONCLUSIVE, not a clean sweep.
+missing_dep() {
+  if [ "$APPLY" = "1" ]; then
+    echo "sweep: WARNING — $1 not found; --apply sweep INCONCLUSIVE." >&2
+    exit 1
+  fi
+  echo "sweep: $1 not found — skipping."
+  exit 0
+}
+command -v bd >/dev/null 2>&1 || missing_dep bd
+command -v jq >/dev/null 2>&1 || missing_dep jq
+
+# RFC-3339 timestamp → epoch seconds (same tolerance as the reaper: trailing Z
+# or numeric offset, optional fractional seconds; GNU then BSD date). Empty or
+# unparseable prints nothing — the caller treats that as "unknown".
+to_epoch() {
+  local ts="${1:-}"
+  [ -n "$ts" ] || { printf ''; return 0; }
+  ts="$(printf '%s' "$ts" | sed -E 's/\.[0-9]+//')"
+  local e=""
+  e="$(date -u -d "$ts" +%s 2>/dev/null || true)"
+  if [ -z "$e" ]; then
+    e="$(date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$ts" +%s 2>/dev/null || true)"
+  fi
+  if [ -z "$e" ]; then
+    local ts2; ts2="$(printf '%s' "$ts" | sed -E 's/([+-][0-9]{2}):([0-9]{2})$/\1\2/')"
+    e="$(date -u -j -f "%Y-%m-%dT%H:%M:%S%z" "$ts2" +%s 2>/dev/null || true)"
+  fi
+  printf '%s' "$e"
+}
+
+# Escape ERE metacharacters so a bead id is matched literally.
+regex_escape() { printf '%s' "$1" | sed -E 's/[][(){}.^$*+?|\\]/\\&/g'; }
+
+# Whole-token bead-id match — same boundary rules as the reaper (ids contain a
+# hyphen and may contain dots; `.1`/`-2` extend an id, a trailing `.` does not).
+bead_referenced() {
+  local esc; esc="$(regex_escape "$1")"
+  printf '%s' "$2" | grep -Eq "(^|[^A-Za-z0-9.-])${esc}(\$|[^A-Za-z0-9.-]|[.-](\$|[^A-Za-z0-9]))"
+}
+
+# ----- gather open/draft PRs (id references AND open PR numbers) -----
+# Quote-aware split for --pr-lister so quoted args with spaces stay one argv
+# token (same pattern as reap-stale-claims). Bash 3.2-safe; xargs tokenizes
+# like the shell without eval.
+PR_LISTER_ARR=()
+while IFS= read -r -d '' __pr_word; do
+  PR_LISTER_ARR+=("$__pr_word")
+done < <(printf '%s\n' "$PR_LIST_CMD" | xargs printf '%s\0')
+pr_ok=1
+pr_lines=""       # one "<title> <headRefName> <body>" line per open/draft PR
+open_pr_numbers=""  # newline-separated open PR numbers, for the notes-cite probe
+# pr_ok stays 1 ONLY if BOTH the PR command AND the jq parse succeed — a
+# swallowed error must not masquerade as "no PRs" and let a parked bead be
+# restored into a live conflict.
+if pr_raw="$("${PR_LISTER_ARR[@]}" 2>/dev/null)"; then
+  # `jq '.[]?'` exits 0 on null/objects/garbage-free scalars, so require the
+  # payload to actually BE an array before trusting an empty probe result.
+  if printf '%s' "$pr_raw" | jq -e 'type == "array"' >/dev/null 2>&1 \
+    && pr_lines="$(printf '%s' "$pr_raw" | jq -r '.[] | ((.title // "") + " " + (.headRefName // "") + " " + (.body // ""))' 2>/dev/null)" \
+    && open_pr_numbers="$(printf '%s' "$pr_raw" | jq -r '.[] | .number // empty' 2>/dev/null)"; then
+    :
+  else
+    pr_ok=0
+  fi
+else
+  pr_ok=0
+fi
+
+pr_protects() {  # does any open/draft PR reference this bead id?
+  [ -n "$pr_lines" ] || return 1
+  bead_referenced "$1" "$pr_lines"
+}
+
+notes_cite_open_pr() {  # do the notes mention `#N` for a still-open PR N? prints N
+  # Iterate the notes' own `#N` references (a handful at most) against the
+  # open-PR set, not the other way round — the PR list can be 500 entries, and
+  # a per-PR grep against every deferred bead would spawn thousands of
+  # subprocesses on a big backlog.
+  local notes="$1" n
+  [ -n "$open_pr_numbers" ] || return 1
+  while IFS= read -r n; do
+    [ -n "$n" ] || continue
+    if printf '%s\n' "$open_pr_numbers" | grep -Fxq "$n"; then
+      printf '%s' "$n"
+      return 0
+    fi
+  done <<< "$(printf '%s' "$notes" | grep -oE '#[0-9]+' | tr -d '#' | sort -u)"
+  return 1
+}
+
+# external_ref probe. `gh-pr-N` is a same-repo reference, checkable against
+# the open-PR list. An absolute pull URL may point at ANOTHER repository the
+# lister never sees, so it always HOLDs (fail closed) rather than guessing.
+external_ref_open_pr() {  # does external_ref name a still-open same-repo PR? prints N
+  local ref="$1" n=""
+  [ -n "$ref" ] || return 1
+  n="$(printf '%s' "$ref" | sed -En 's/^gh-pr-([0-9]+)$/\1/p')"
+  [ -n "$n" ] || return 1
+  if printf '%s\n' "$open_pr_numbers" | grep -Fxq "$n"; then
+    printf '%s' "$n"
+    return 0
+  fi
+  return 1
+}
+
+external_ref_pull_url() {  # is external_ref an absolute pull URL (unverifiable here)?
+  printf '%s' "${1:-}" | grep -Eq '/pull/[0-9]+'
+}
+
+# ----- blocking-dependency probe -----
+# Uncached on purpose: dep targets number in the dozens at most, and a cache
+# in a $(…) subshell could never persist to the parent anyway.
+dep_status() {
+  local st
+  st="$(bd show "$1" --json 2>/dev/null | jq -r '(if type=="array" then .[0] else . end) | (.status // "unknown")' 2>/dev/null || printf 'unknown')"
+  [ -n "$st" ] || st="unknown"
+  printf '%s' "$st"
+}
+
+open_blocking_dep() {  # prints the first non-closed `blocks` target, if any
+  local row="$1" tid st
+  while IFS= read -r tid; do
+    [ -n "$tid" ] || continue
+    st="$(dep_status "$tid")"
+    if [ "$st" != "closed" ]; then
+      printf '%s' "$tid"
+      return 0
+    fi
+  done <<< "$(printf '%s' "$row" | jq -r '(.dependencies // [])[] | select((.type // "") == "blocks") | .depends_on_id // empty')"
+  return 1
+}
+
+# ----- guarded restore (same shape as the reaper's guarded release) -----
+guarded_restore() {
+  local id="$1" was_updated="$2"
+  local reread ns nu
+  reread="$(bd show "$id" --json 2>/dev/null || echo '[]')"
+  ns="$(printf '%s' "$reread" | jq -r '(if type=="array" then .[0] else . end) | (.status // "")' 2>/dev/null || true)"
+  nu="$(printf '%s' "$reread" | jq -r '(if type=="array" then .[0] else . end) | (.updated_at // "")' 2>/dev/null || true)"
+  # A failed or unparseable re-read is a FAILED restore, not a benign ABORT:
+  # the bead is still deferred and the pass must not report a clean sweep.
+  if [ -z "$ns" ]; then
+    failed_count=$((failed_count + 1))
+    printf 'FAILED    %s  could not re-read bead before restore — skipped\n' "$id"
+    return 0
+  fi
+  if [ "$ns" != "deferred" ]; then
+    abort_count=$((abort_count + 1))
+    printf 'ABORT     %s  no longer deferred (now %s) — not restored\n' "$id" "${ns:-<unknown>}"
+    return 0
+  fi
+  if [ "$nu" != "$was_updated" ]; then
+    abort_count=$((abort_count + 1))
+    printf 'ABORT     %s  activity since scan (updated_at moved) — not restored\n' "$id"
+    return 0
+  fi
+  # Only the SAME lapsed deferral reaches here. Restore + clear the trappings.
+  # A failed update must not kill the pass under `set -e` — report, count,
+  # and move on; the pass exits non-zero at the end if anything failed.
+  if bd update "$id" --status open --assignee "" --defer "" --unset-metadata lease_until >/dev/null 2>&1; then
+    printf 'RESTORED  %s\n' "$id"
+  else
+    failed_count=$((failed_count + 1))
+    printf 'FAILED    %s  bd update failed — skipped\n' "$id"
+  fi
+}
+
+# ----- scan deferred beads -----
+# A read failure must NOT look like "nothing lapsed" — that would silently
+# disable the recovery path this script exists to provide.
+# --limit 0 is required: bd list defaults to 50.
+if ! deferred_json="$(bd list --status deferred --limit 0 --json 2>/dev/null)"; then
+  echo "sweep: WARNING — could not read deferred beads (bd error); sweep INCONCLUSIVE." >&2
+  exit 1
+fi
+# Same array requirement as the PR probe: null/objects/scalars parse "cleanly"
+# through `.[]?` but are NOT a bead list — treat them as a read failure.
+if ! printf '%s' "$deferred_json" | jq -e 'type == "array"' >/dev/null 2>&1 \
+  || ! rows="$(printf '%s' "$deferred_json" | jq -c '.[]' 2>/dev/null)"; then
+  echo "sweep: WARNING — could not parse Beads JSON; sweep INCONCLUSIVE." >&2
+  exit 1
+fi
+
+restore_count=0 hold_count=0 pending_count=0 failed_count=0 abort_count=0
+
+if [ "$APPLY" = "1" ]; then
+  echo "reap-lapsed-defers: --apply (guarded restore; report-only is the default)"
+else
+  echo "reap-lapsed-defers: REPORT ONLY (dry-run) — pass --apply to restore"
+fi
+
+while IFS= read -r row; do
+  [ -n "$row" ] || continue
+  id="$(printf '%s' "$row" | jq -r '.id // ""')"
+  [ -n "$id" ] || continue
+  updated="$(printf '%s' "$row" | jq -r '.updated_at // ""')"
+  defer_until="$(printf '%s' "$row" | jq -r '.defer_until // ""')"
+  notes="$(printf '%s' "$row" | jq -r '.notes // ""')"
+  external_ref="$(printf '%s' "$row" | jq -r '.external_ref // ""')"
+  assignee="$(printf '%s' "$row" | jq -r '.assignee // ""')"
+
+  verdict="" reason=""
+
+  defer_epoch="$(to_epoch "$defer_until")"
+  updated_epoch="$(to_epoch "$updated")"
+  # Grace baseline is the LATER of defer_until and updated_at: bd 1.1.2 can
+  # stamp a relative deferral hours in the past (gastownhall/beads#5233), so a
+  # cooldown stamped moments ago may already read as lapsed. Anchoring on the
+  # bead's last activity keeps a fresh park inside the grace window.
+  grace_base="$defer_epoch"
+  if [ -n "$updated_epoch" ] && [ "$updated_epoch" -gt "${grace_base:-0}" ]; then
+    grace_base="$updated_epoch"
+  fi
+  if [ -z "$defer_epoch" ] && [ -n "$defer_until" ]; then
+    verdict="HOLD"; reason="defer_until unparseable: ${defer_until} — left for triage"
+  elif [ -z "$defer_epoch" ]; then
+    verdict="HOLD"; reason="no defer_until (open-ended park) — left for triage"
+  elif [ "$NOW" -le $((grace_base + GRACE_SECONDS)) ]; then
+    pending_count=$((pending_count + 1)); continue      # timer still running (or within grace)
+  elif [ "$pr_ok" != "1" ]; then
+    verdict="HOLD"; reason="defer lapsed; PR check unavailable — left for triage"
+  elif [ -n "$assignee" ]; then
+    # A cooldown-release always clears the assignee; one still present means
+    # someone parked their OWN work on purpose. Restoring would strip it.
+    verdict="HOLD"; reason="defer lapsed; still assigned to ${assignee} — left for triage"
+  elif pr_protects "$id"; then
+    verdict="HOLD"; reason="defer lapsed; open/draft PR references it — left for triage"
+  elif cited="$(notes_cite_open_pr "$notes")"; then
+    verdict="HOLD"; reason="defer lapsed; notes cite open PR #${cited} — left for triage"
+  elif cited="$(external_ref_open_pr "$external_ref")"; then
+    verdict="HOLD"; reason="defer lapsed; external_ref names open PR #${cited} — left for triage"
+  elif external_ref_pull_url "$external_ref"; then
+    verdict="HOLD"; reason="defer lapsed; external_ref is a pull URL (possibly another repo, unverifiable here) — left for triage"
+  elif blocking="$(open_blocking_dep "$row")"; then
+    verdict="HOLD"; reason="defer lapsed; blocking dep ${blocking} is open — left for triage"
+  elif printf '%s' "$notes" | grep -Eq '(^|[[:space:]])Wait:|external-wait'; then
+    verdict="HOLD"; reason="defer lapsed; external-wait marker in notes — left for triage"
+  else
+    verdict="RESTORE"; reason="defer lapsed at ${defer_until} (>${GRACE_SECONDS}s grace)"
+  fi
+
+  if [ "$verdict" = "RESTORE" ]; then
+    restore_count=$((restore_count + 1))
+    if [ "$APPLY" = "1" ]; then
+      guarded_restore "$id" "$updated"
+    else
+      printf 'RESTORE   %s  %s\n' "$id" "$reason"
+    fi
+  else
+    hold_count=$((hold_count + 1))
+    printf 'HOLD      %s  %s\n' "$id" "$reason"
+  fi
+done <<< "$rows"
+
+if [ "$APPLY" = "1" ]; then
+  # In apply mode the count is what actually reopened — candidates minus
+  # failures minus guard aborts — agreeing with the per-bead lines above.
+  printf 'summary: %s restored, %s held-for-triage, %s not-lapsed, %s failed, %s aborted\n' \
+    "$((restore_count - failed_count - abort_count))" "$hold_count" "$pending_count" "$failed_count" "$abort_count"
+else
+  printf 'summary: %s restorable, %s held-for-triage, %s not-lapsed, %s failed\n' "$restore_count" "$hold_count" "$pending_count" "$failed_count"
+fi
+# Exit contract: report mode exits 0 on a clean run (and on the missing-dep
+# skip above), but a bd read/parse failure earlier exits 1 (INCONCLUSIVE) in
+# EITHER mode — a read error must never look like "nothing lapsed". An
+# --apply pass with any failed restore also exits non-zero so callers can
+# tell an incomplete sweep from a clean one.
+if [ "$APPLY" = "1" ] && [ "$failed_count" -gt 0 ]; then exit 1; fi
+exit 0

@@ -1,7 +1,7 @@
 # agent-ops.mk — installed by `scaffold agent-ops install`. Do not edit; re-run
 # the installer to update. Targets marked [agent-safe] may run unattended.
 
-.PHONY: main-sync prune-merged doctor doctor-fix beads-snapshot reap-stale-claims \
+.PHONY: main-sync prune-merged doctor doctor-fix beads-snapshot reap-stale-claims reap-lapsed-defers \
         staging-up staging-down staging-shared-down staging-prune docker-doctor tc-reap \
         mq-enqueue mq-status mq-daemon mq-eject mq-stats post-merge-watch
 
@@ -11,8 +11,17 @@ main-sync: ## [agent-safe] Fetch + fast-forward main from anywhere
 reap-stale-claims: ## [agent-safe] Report abandoned Beads claims (ARGS=--apply to release, ask-first)
 	@scripts/reap-stale-claims.sh $(ARGS)
 
-prune-merged: ## [agent-safe] Sweep merged branches/worktrees + reclaim staging
+reap-lapsed-defers: ## [agent-safe] Report lapsed deferred beads (ARGS=--apply to restore)
+	@test -x scripts/reap-lapsed-defers.sh || { echo "reap-lapsed-defers not installed (run: scaffold agent-ops install --component git)"; exit 1; }
+	@scripts/reap-lapsed-defers.sh $(ARGS)
+
+# The defer-wake runs mechanically after every merge sweep (guarded --apply:
+# HOLD rules protect deliberate parks) so lapsed cooldowns can never silently
+# rebuild into deferred debt — bd itself never wakes them (gastownhall/beads#5289).
+# Feature-detected so an older install without the sweeper keeps working.
+prune-merged: ## [agent-safe] Sweep merged branches/worktrees + reclaim staging + wake lapsed defers
 	@scripts/cleanup-merged-branches.sh $(ARGS)
+	@if [ -x scripts/reap-lapsed-defers.sh ]; then scripts/reap-lapsed-defers.sh --apply || echo "reap-lapsed-defers: incomplete sweep — rerun: make reap-lapsed-defers ARGS=--apply"; fi
 
 doctor: ## [agent-safe] Diagnose primary-checkout invariant (read-only)
 	@scripts/doctor.sh

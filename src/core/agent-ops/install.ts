@@ -55,6 +55,11 @@ export const AGENT_OPS_FILE_MAP: Record<string, AgentOpsFileSpec> = {
     component: 'git',
     executable: true,
   },
+  'git/reap-lapsed-defers.sh.tmpl': {
+    dest: 'scripts/reap-lapsed-defers.sh',
+    component: 'git',
+    executable: true,
+  },
   'git/bd-claim-smoke-test.sh.tmpl': {
     dest: 'scripts/bd-claim-smoke-test.sh',
     component: 'git',
