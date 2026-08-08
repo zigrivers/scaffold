@@ -126,9 +126,11 @@ setup() {
   # §4.1 claim-then-validate ordering (claim BEFORE the validation gates).
   grep -qiF 'claim first' "$skill_file" \
     || failures+=("missing claim-then-validate ordering ('claim first')")
-  # §4.1 single-command cooldown-release on a validation reject (NOT --status open).
-  grep -qF 'bd update <id> --assignee "" --defer +1h' "$skill_file" \
-    || failures+=("missing single-command cooldown-release 'bd update <id> --assignee \"\" --defer +1h'")
+  # §4.1 single-command cooldown-release on a validation reject (NOT --status
+  # open, and an ABSOLUTE UTC instant — bd ≤1.1.2 stamps relative offsets in
+  # local wall time, gastownhall/beads#5233).
+  grep -qF 'bd update <id> --assignee "" --defer "$until"' "$skill_file" \
+    || failures+=("missing single-command cooldown-release 'bd update <id> --assignee \"\" --defer \"\$until\"'")
   # §6.1 claims-as-leases (TTL + heartbeat).
   grep -qF 'lease_until' "$skill_file" \
     || failures+=("missing lease mechanism (lease_until)")
