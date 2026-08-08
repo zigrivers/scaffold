@@ -258,8 +258,8 @@ c. **On a gate REJECT** (you hold it, but it is a dup/conflict — a PERSISTENT
 
    ```bash
    bd note <id> "cooldown-release ($BEADS_ACTOR): <what rejected it — PR/bead/surface>"
-   until="$(date -u -v+1H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%SZ)"
-   bd update <id> --assignee "" --defer "$until" --unset-metadata lease_until
+   until_ts="$(date -u -v+1H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%SZ)"
+   bd update <id> --assignee "" --defer "$until_ts" --unset-metadata lease_until
    ```
 
    That clears ownership + the lease AND leaves the bead `deferred` (out of
@@ -467,7 +467,7 @@ If the batch ran long and `launchpad` is installed: `launchpad notify "<summary>
 | Claim without a per-agent `BEADS_ACTOR` | Same-actor claims are idempotent — two agents sharing the default identity both "own" the bead |
 | Retry a lost claim | Normal traffic at high parallelism — take the next candidate |
 | Validate a bead before claiming it | Claim first — validation reads shared state; holding the claim hides the bead from peers while you decide |
-| Release a rejected bead straight to `--status open` | Persistent dup/conflict → the fleet re-claims/re-rejects it forever; cooldown-release with an ABSOLUTE UTC `--defer "$until"` instead (see 2.1c) |
+| Release a rejected bead straight to `--status open` | Persistent dup/conflict → the fleet re-claims/re-rejects it forever; cooldown-release with an ABSOLUTE UTC `--defer "$until_ts"` instead (see 2.1c) |
 | Skip or park a bead because its `Owner` is another agent | `Owner` is the immutable CREATOR, not an assignee — it names a departed agent forever. Only `Assignee` + `in_progress` holds a bead (Step 1) |
 | Honor an existing park note without re-resolving what it cites | Park notes go stale silently; a "recheck: still parked" line you did not verify is the ratchet that freezes a backlog (2.1b) |
 | `bd update <id> --notes "..."` on an existing bead | `--notes` REPLACES — it can destroy a bead's whole investigation history in one command. Use `bd note` / `--append-notes` (2.1c) |

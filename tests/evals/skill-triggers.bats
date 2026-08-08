@@ -129,8 +129,8 @@ setup() {
   # §4.1 single-command cooldown-release on a validation reject (NOT --status
   # open, and an ABSOLUTE UTC instant — bd ≤1.1.2 stamps relative offsets in
   # local wall time, gastownhall/beads#5233).
-  grep -qF 'bd update <id> --assignee "" --defer "$until"' "$skill_file" \
-    || failures+=("missing single-command cooldown-release 'bd update <id> --assignee \"\" --defer \"\$until\"'")
+  grep -qF 'bd update <id> --assignee "" --defer "$until_ts"' "$skill_file" \
+    || failures+=("missing single-command cooldown-release 'bd update <id> --assignee \"\" --defer \"\$until_ts\"'")
   # §6.1 claims-as-leases (TTL + heartbeat).
   grep -qF 'lease_until' "$skill_file" \
     || failures+=("missing lease mechanism (lease_until)")

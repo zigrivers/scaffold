@@ -253,9 +253,6 @@ describe('merge-queue and ci components', () => {
     expect(AGENT_OPS_FILE_MAP['ci/nightly.yml.tmpl']).toEqual({
       dest: '.github/workflows/nightly.yml', component: 'ci', executable: false,
     })
-    expect(AGENT_OPS_FILE_MAP['git/reap-lapsed-defers.sh.tmpl']).toEqual({
-      dest: 'scripts/reap-lapsed-defers.sh', component: 'git', executable: true,
-    })
   })
 
   it('adds .mq/ to .gitignore when installing merge-queue, idempotently', () => {
@@ -326,5 +323,13 @@ describe('buildTemplateVars extensions', () => {
   it('DEFAULT_BRANCH falls back to main outside a repo with origin/HEAD', () => {
     const vars = buildTemplateVars(defaultAgentOpsConfig('/tmp/x'), '/tmp/definitely-not-a-repo')
     expect(vars.DEFAULT_BRANCH).toBe('main')
+  })
+})
+
+describe('lapsed-defer sweeper (git component)', () => {
+  it('registers the file-map entry', () => {
+    expect(AGENT_OPS_FILE_MAP['git/reap-lapsed-defers.sh.tmpl']).toEqual({
+      dest: 'scripts/reap-lapsed-defers.sh', component: 'git', executable: true,
+    })
   })
 })

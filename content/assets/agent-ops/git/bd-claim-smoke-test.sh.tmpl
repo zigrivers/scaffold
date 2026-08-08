@@ -77,14 +77,19 @@ ok 'release (--assignee "") clears the assignee'
 
 # 3) Single-command cooldown-release with an ABSOLUTE UTC instant (NOT --status
 #    open, and NOT a relative offset — bd ≤1.1.2 stamps those in local wall time).
-to_epoch() {
-  date -u -d "$1" +%s 2>/dev/null || date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$1" +%s 2>/dev/null || printf ''
+to_epoch() {  # same tolerance as the sweeper: fractional seconds stripped, GNU then BSD date
+  local ts="${1:-}" e=""
+  [ -n "$ts" ] || { printf ''; return 0; }
+  ts="$(printf '%s' "$ts" | sed -E 's/\.[0-9]+//')"
+  e="$(date -u -d "$ts" +%s 2>/dev/null || true)"
+  [ -n "$e" ] || e="$(date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$ts" +%s 2>/dev/null || true)"
+  printf '%s' "$e"
 }
 B="$(mkbead 'cooldown')"
 [ -n "$B" ] || fail "could not create the cooldown test bead (bd create --json / id parse)"
 bd update "$B" --claim --actor alpha-agent >/dev/null 2>&1 || fail "claim B failed"
-UNTIL="$(date -u -v+1H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%SZ)"
-bd update "$B" --assignee "" --defer "$UNTIL" --unset-metadata lease_until >/dev/null 2>&1 || fail "cooldown-release failed"
+UNTIL_TS="$(date -u -v+1H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%SZ)"
+bd update "$B" --assignee "" --defer "$UNTIL_TS" --unset-metadata lease_until >/dev/null 2>&1 || fail "cooldown-release failed"
 if bd ready --json 2>/dev/null | grep -qF -- "$B"; then
   fail "a deferred bead must be HIDDEN from bd ready (did --status open cancel the defer?)"
 fi
@@ -106,6 +111,26 @@ ok "stored defer_until is in the future ($STORED)"
 bd update "$B" --status open --assignee "" --defer "" --unset-metadata lease_until >/dev/null 2>&1 || fail "wake restore (status open + clear defer + clear lease) failed"
 bd ready --json 2>/dev/null | grep -qF -- "$B" || fail "a woken bead must REAPPEAR in bd ready (restore round-trip broken)"
 ok 'wake restore returns a deferred bead to bd ready'
+
+# 3c) Append-only notes: the protocol forbids `--notes` (it REPLACES the field)
+#     and relies on `bd note` appending — verify the primitive exists and appends
+#     (jq-gated: the fallback extractor collapses whitespace).
+if command -v jq >/dev/null 2>&1; then
+  bd note "$B" "first probe note" >/dev/null 2>&1 || fail "bd note failed — the append-only notes primitive is missing"
+  bd note "$B" "second probe note" >/dev/null 2>&1 || fail "second bd note failed"
+  NOTES_ALL="$(bd show "$B" --json 2>/dev/null | jq -r '(if type=="array" then .[0] else . end) | (.notes // "")')"
+  case "$NOTES_ALL" in
+    *"first probe note"*) : ;;
+    *) fail "bd note did not APPEND — the first note was lost (did bd note start replacing?)" ;;
+  esac
+  case "$NOTES_ALL" in
+    *"second probe note"*) : ;;
+    *) fail "bd note did not record the second note" ;;
+  esac
+  ok 'bd note appends (both notes survive)'
+else
+  echo "  skip bd-note append check (jq not installed)"
+fi
 
 # 4) Lease metadata lifecycle (jq-gated — the reaper needs to read metadata.lease_until).
 if command -v jq >/dev/null 2>&1; then
