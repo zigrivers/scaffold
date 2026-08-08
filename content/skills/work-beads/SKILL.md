@@ -264,7 +264,9 @@ c. **On a gate REJECT** (you hold it, but it is a dup/conflict — a PERSISTENT
    gastownhall/beads#5289): restore is the shipped sweeper —
    `make prune-merged` auto-applies `scripts/reap-lapsed-defers.sh` after every
    merge sweep, and report mode runs at orient — or a manual `bd undefer`. Do
-   NOT add `--status open` — it cancels the defer. Do NOT pass a RELATIVE
+   NOT add `--status open` to the release — it cancels the defer you just set
+   (that cancellation is exactly what the sweeper's wake does later, on
+   purpose). Do NOT pass a RELATIVE
    offset (`+1h`): bd (≤1.1.2) serializes it as local wall-clock stamped `Z`
    (gastownhall/beads#5233), so west of UTC the cooldown lands in the PAST (and
    `+30m` reads as 30 MONTHS). Add the ID to the SKIP-SET and take the next

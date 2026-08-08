@@ -99,6 +99,10 @@ ok "stored defer_until is in the future ($STORED)"
 
 # 3b) Wake primitive: the exact restore the lapsed-defer sweeper performs must
 #     return the bead to bd ready — bd never does this on its own (#5289).
+#     NOTE: `--status open` + `--defer ""` deliberately CANCELS the deferral —
+#     the intended effect of a wake. The same combination is forbidden in the
+#     cooldown-release (work-beads 2.1c), where the defer must SURVIVE the
+#     release; these are opposite operations, not a contradiction.
 bd update "$B" --status open --assignee "" --defer "" >/dev/null 2>&1 || fail "wake restore (status open + clear defer) failed"
 bd ready --json 2>/dev/null | grep -qF -- "$B" || fail "a woken bead must REAPPEAR in bd ready (restore round-trip broken)"
 ok 'wake restore returns a deferred bead to bd ready'
