@@ -141,15 +141,19 @@ pr_protects() {  # does any open/draft PR reference this bead id?
 }
 
 notes_cite_open_pr() {  # do the notes mention `#N` for a still-open PR N? prints N
+  # Iterate the notes' own `#N` references (a handful at most) against the
+  # open-PR set, not the other way round — the PR list can be 500 entries, and
+  # a per-PR grep against every deferred bead would spawn thousands of
+  # subprocesses on a big backlog.
   local notes="$1" n
   [ -n "$open_pr_numbers" ] || return 1
   while IFS= read -r n; do
     [ -n "$n" ] || continue
-    if printf '%s' "$notes" | grep -Eq "#${n}([^0-9]|\$)"; then
+    if printf '%s\n' "$open_pr_numbers" | grep -Fxq "$n"; then
       printf '%s' "$n"
       return 0
     fi
-  done <<< "$open_pr_numbers"
+  done <<< "$(printf '%s' "$notes" | grep -oE '#[0-9]+' | tr -d '#' | sort -u)"
   return 1
 }
 

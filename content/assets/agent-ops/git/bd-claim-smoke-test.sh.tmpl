@@ -103,7 +103,7 @@ ok "stored defer_until is in the future ($STORED)"
 #     the intended effect of a wake. The same combination is forbidden in the
 #     cooldown-release (work-beads 2.1c), where the defer must SURVIVE the
 #     release; these are opposite operations, not a contradiction.
-bd update "$B" --status open --assignee "" --defer "" >/dev/null 2>&1 || fail "wake restore (status open + clear defer) failed"
+bd update "$B" --status open --assignee "" --defer "" --unset-metadata lease_until >/dev/null 2>&1 || fail "wake restore (status open + clear defer + clear lease) failed"
 bd ready --json 2>/dev/null | grep -qF -- "$B" || fail "a woken bead must REAPPEAR in bd ready (restore round-trip broken)"
 ok 'wake restore returns a deferred bead to bd ready'
 

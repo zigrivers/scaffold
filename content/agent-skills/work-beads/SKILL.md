@@ -151,9 +151,10 @@ cooldown-released this invocation, and skip them when you re-rank.
 bd, `Owner` is the immutable identity of whoever CREATED the bead, so it goes on
 naming a long-departed agent forever. Only `Assignee` + `in_progress` means
 someone holds it, and the atomic claim at 2.1 is what detects that. Beware that
-`bd list --json` OMITS the assignee field, so reading it there returns nothing
-for every bead including held ones — query holders with `bd ready --unassigned`,
-`bd list --assignee <name>`, or `bd show <id>` (which does print it).
+some bd builds have omitted the assignee field from `bd list --json` output —
+if a listing shows no assignee, confirm with `bd show <id>` (which does print
+it) before concluding a bead is unheld; `bd ready --unassigned` and
+`bd list --assignee <name>` are the reliable holder queries.
 
 Cheap pre-claim exclusions (knowable from the queue view — skip before claiming):
 - the merge-slot infrastructure bead: the project's `<prefix>-merge-slot` bead

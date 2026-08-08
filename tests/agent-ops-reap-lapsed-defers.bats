@@ -50,7 +50,7 @@ EOF
     printf '[]' > "$FX/prs.json"
 }
 
-teardown() { rm -rf "$FX"; }
+teardown() { [ -n "${FX:-}" ] && rm -rf "$FX" || true; }
 
 # Helper: write the deferred-list fixture from inline JSON.
 write_deferred() { printf '%s' "$1" > "$FX/deferred.json"; }
@@ -127,6 +127,16 @@ LAPSED='[{"id":"proj-cold","status":"deferred","assignee":"","updated_at":"2026-
     [ ! -f "$FX/bd-update.log" ]
     [[ "$output" == *"HOLD"* ]]
     [[ "$output" == *"external-wait"* ]]
+}
+
+@test "notes citing a still-open PR number HOLD the bead (file-conflict park)" {
+    write_deferred '[{"id":"proj-note","status":"deferred","assignee":"","updated_at":"2026-07-15T05:00:00Z","defer_until":"2026-07-15T05:00:00Z","notes":"parked: Draft PR #42 modifies these exact files","external_ref":""}]'
+    printf '%s' '[{"number":42,"title":"other work","body":"unrelated","isDraft":true,"headRefName":"feature-x"}]' > "$FX/prs.json"
+    run "$FX/reap-lapsed-defers.sh" --apply
+    [ "$status" -eq 0 ]
+    [ ! -f "$FX/bd-update.log" ]
+    [[ "$output" == *"HOLD"* ]]
+    [[ "$output" == *"#42"* ]]
 }
 
 @test "a non-closed blocks dependency HOLDs the bead" {
