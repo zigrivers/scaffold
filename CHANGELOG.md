@@ -4,6 +4,55 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.54.0] - 2026-08-07
+
+Deferred-debt release. Two generated projects (nibble, rumble) independently
+froze hundreds of Beads tasks in a `deferred` state nothing ever woke; both
+field fixes converged on "add the wake", and this release ships the converged
+answer so no future project rebuilds the debt (#818).
+
+### Added
+
+- **`scripts/reap-lapsed-defers.sh`** joins the agent-ops git bundle: a
+  lapsed-defer sweeper for the Beads queue. `bd` (through 1.1.2) never returns
+  a deferred bead to `bd ready` when its `defer_until` passes
+  (gastownhall/beads#5289) — the cooldown-release the work-beads loop mandates
+  therefore parked tasks forever. The sweeper is report-only by default; a
+  guarded `--apply` restores lapsed deferrals while HOLDing deliberate parks
+  (open/draft PR references, notes citing open PRs, PR `external_ref`s,
+  non-closed blocking dependencies, `Wait:`/`external-wait` markers,
+  still-assigned beads, and missing or unparseable timestamps). The grace
+  window anchors on the bead's last activity, so bd's relative-defer timezone
+  skew (gastownhall/beads#5233) cannot cause a premature wake.
+- **`make prune-merged` auto-applies the wake** after every merge sweep
+  (feature-detected and loud-but-non-fatal), plus a standalone
+  `make reap-lapsed-defers` target — lapsed cooldowns can no longer rebuild
+  silently.
+- **The bd-claim smoke test covers the defer round-trip**: the stored
+  `defer_until` must be in the future, the sweeper's exact restore must return
+  the bead to `bd ready`, and `bd note` must append (never replace).
+
+### Fixed
+
+- **The work-beads skill promised a lifecycle bd does not implement** — it
+  claimed a cooldown-released bead "reappears unassigned when the cooldown
+  lapses." It never did. The skill now states the real lifecycle (the sweeper
+  wakes it; bd never does), computes ABSOLUTE UTC defer instants instead of
+  relative offsets, requires append-only notes (`bd note`, never the replacing
+  `--notes`), requires defer reasons a later agent can re-resolve (banning
+  unfalsifiable capacity excuses), bans mass-deferral, and escalates a bead
+  cooldown-released twice for the same cause to a `Wait:` note + human triage
+  instead of cycling claim→reject→defer forever. New Step-1 guidance: `Owner`
+  is the immutable creator, not an assignee, and stale park notes must be
+  re-verified against what they cite before being honored.
+- **Generated `docs/beads-workflow.md` gains a "deferred is a cooldown, not a
+  graveyard" section** (beads pipeline step), including the instruction to
+  file a tracking bead retiring both workarounds when a bd release fixes the
+  upstream bugs.
+- **The perf suite's budget and timeout were sized from measured CI runs**
+  (#813, #816) — the state-write assertion now budgets the median, and the
+  suite timeout matches what the suite actually does.
+
 ## [3.53.3] - 2026-07-28
 
 Documentation-correctness release. The bundled reference guides are audited
