@@ -253,6 +253,9 @@ describe('merge-queue and ci components', () => {
     expect(AGENT_OPS_FILE_MAP['ci/nightly.yml.tmpl']).toEqual({
       dest: '.github/workflows/nightly.yml', component: 'ci', executable: false,
     })
+    expect(AGENT_OPS_FILE_MAP['git/reap-lapsed-defers.sh.tmpl']).toEqual({
+      dest: 'scripts/reap-lapsed-defers.sh', component: 'git', executable: true,
+    })
   })
 
   it('adds .mq/ to .gitignore when installing merge-queue, idempotently', () => {
