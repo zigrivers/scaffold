@@ -4,7 +4,7 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
-## [3.54.0] - 2026-08-08
+## [3.54.0] - 2026-08-07
 
 Deferred-debt release. Two generated projects (nibble, rumble) independently
 froze hundreds of Beads tasks in a `deferred` state nothing ever woke; both
