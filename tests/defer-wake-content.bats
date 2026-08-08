@@ -57,7 +57,8 @@ BEADS="$ROOT/content/pipeline/foundation/beads.md"
 @test "skill escalates repeated cooldowns to human triage instead of cycling forever" {
   # A persistent dup/conflict must not claim->reject->defer->wake hourly forever.
   grep -qi 'cooldown-release note' "$SKILL"
-  awk '/prior cooldown/,/triage/' "$SKILL" | grep -qi 'do NOT re-defer'
+  grep -qi 'Escalate instead of cycling' "$SKILL"
+  grep -qi 'do NOT re-defer' "$SKILL"
 }
 
 # --- beads pipeline step (generated docs/beads-workflow.md) ---
