@@ -102,7 +102,8 @@ mark which parts are queue-only.
   (8) sync main via `make main-sync && make
   prune-merged` — with step 5.5 = `mmr review --pr <N> --sync
   --format json` between creating the PR and the gate/enqueue steps,
-  including the 3-round cap and the degraded-pass self-merge path
+  including the 3-round cap and the explicit keep-open path for a verified
+  fix-now or block item that remains at the cap
 - (deep) `scripts/setup-agent-worktree.sh` is confirmed present via
   `scaffold agent-ops install --component git` + `scaffold agent-ops
   check` — not hand-authored; creates worktrees at the project-local
@@ -366,10 +367,16 @@ Depth-gate per Methodology Scaling above.
    (5) `gh pr create` (auto-applies `.github/pull_request_template.md`) ->
    **step 5.5: `mmr review --pr <N> --sync --format json`** (mandatory;
    group duplicate findings by root cause and give each one a finite
-   disposition. Severity alone never creates a bead. A follow-up must be
+   disposition. The original bead and its acceptance criteria bound the PR's
+   required scope. Severity alone never creates a bead. A follow-up must be
    reproducible, actionable, non-duplicate, worth scheduling, and outside
-   scope; hard cap 3 rounds, then stop when every root cause is dispositioned
-   and no acceptance-criteria or mandatory-guardrail defect remains) ->
+   scope. Mandatory guardrails include at minimum security, privacy, and data
+   integrity (including preventing data loss or corruption), plus every
+   repository or product safeguard required by project instructions. Hard cap
+   3 rounds: review stops when every root cause has a disposition and no
+   verified fix-now or block item remains. At the cap, if either remains, keep
+   the PR open, post the ledger and reproduction, notify the user, and end the
+   batch without merging) ->
    (6) confirm the fast
    gate green on the branch HEAD (`make check-affected`; run full `make
    check` instead when you touched gate config, shared test utils, or

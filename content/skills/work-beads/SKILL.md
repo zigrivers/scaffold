@@ -345,10 +345,12 @@ hook; the cadence is the host's to bind.)*
 every stale doc in this same PR. Check the project-invariants section of
 AGENTS.md (if the project defines one) before shipping.
 
-**2.5 Deliberate scope deferral = bead.** File a bead when accepted scope is
-deliberately removed or a verified defect will not be fixed here. Review output
-uses the finite disposition process in 2.7. Suggestions, severity labels, and
-unsupported or low-value findings do not create beads:
+**2.5 Deliberate scope deferral = bead.** File a bead only when the task owner
+explicitly removes work from the current acceptance criteria or a verified defect
+outside the PR's required scope will not be fixed here, and only when that work
+passes all five follow-up gates in 2.7. A verified defect inside required scope is
+`fix-now` or `block`, never a follow-up. Suggestions, severity labels, and
+unsupported or low-value findings do not create beads.
 
 ```bash
 bd create "<imperative title>" -t task -p 2 --deps discovered-from:<id> \
@@ -377,6 +379,9 @@ fast on a saturated machine: `taskpolicy -c utility make check-affected`
   silently skip a channel.
 - The original bead, its acceptance criteria, and mandatory repository or
   product guardrails bound the PR's required scope.
+- Mandatory guardrails include at minimum security, privacy, and data integrity
+  (including preventing data loss or corruption), plus every repository or
+  product safeguard required by project instructions.
 - Group repeated findings by root cause. Record exactly one finite disposition:
   `fix-now`, `block`, `reject:<reason>`, or `follow-up:<bead-id>`.
 - A model's severity label never creates a bead. Create one follow-up per root cause
@@ -384,9 +389,13 @@ fast on a saturated machine: `taskpolicy -c utility make check-affected`
   and outside the PR's required scope.
 - Round 1 verifies root causes and fixes required defects. Rounds 2–3 review new
   changes and collapse repeats into the existing dispositions.
-- Hard cap: 3 rounds. Stop when every root cause has a disposition and no
-  verified `fix-now` or `block` item remains. Do not rerun review merely to
+- Hard cap: 3 rounds. Review stops when every root cause has a disposition and
+  no verified fix-now or block item remains. Do not rerun review merely to
   clear suggestions, and do not create tasks from review-task review metadata.
+- Review always ends after round 3. At the cap, if a verified fix-now or block
+  item remains, keep the PR open, post the disposition ledger and reproduction,
+  notify the user, and end the batch without merging. Otherwise proceed once all
+  required checks pass.
 - A verified acceptance-criteria or mandatory-guardrail defect blocks merge
   regardless of its model-assigned severity. A follow-up bead cannot make the
   current PR safe.
@@ -464,10 +473,10 @@ If the batch ran long and `launchpad` is installed: `launchpad notify "<summary>
 | Start bead k+1 before bead k's PR merges | One open PR per agent, strictly sequential |
 | Skip the draft PR "until it's ready" | The draft IS the claim other agents see |
 | End the turn after the draft PR with "next steps" | #1 observed agent failure — finish the loop |
-| Leave deliberately deferred accepted scope as a TODO/FIXME comment | That work is a bead, filed now |
+| Leave work accepted for follow-up under 2.5 as a TODO/FIXME comment | That work is a bead, filed now |
 | File a bead because a reviewer called something P2/P3 | Severity is not task authority; apply all five gates in 2.7 |
 | Merge with a red `make check` or a required defect | Fix or block; a future bead cannot make the current PR safe |
-| Chase a clean review past round 3 | Stop when the root-cause ledger is finite and no required defect remains |
+| Chase a clean review past round 3 | Stop dispatching review; merge only when every root cause has a disposition and no verified fix-now or block item remains |
 | Leave a staging stack you started running | `make staging-down` from the worktree before merging (only if you ran `staging-up`; never from the primary — it refuses there, and `prune-merged` reclaims it too) |
 | `--no-verify`, plain `--force`, merge commits | Forbidden; `--force-with-lease` after rebase only |
 | Close the bead when the PR opens | Close only after MERGED + verified |

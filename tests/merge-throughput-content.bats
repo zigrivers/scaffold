@@ -87,12 +87,20 @@ ROOT="$BATS_TEST_DIRNAME/.."
 }
 
 @test "work-beads bounds review findings before creating follow-up beads" {
+  for F in \
+    "$ROOT/content/agent-skills/work-beads/SKILL.md" \
+    "$ROOT/content/skills/work-beads/SKILL.md" \
+    "$ROOT/content/pipeline/environment/automated-pr-review.md" \
+    "$ROOT/content/pipeline/environment/git-workflow.md"; do
+    ! grep -q "files beads for P2/P3" "$F"
+    ! grep -q "file a bead per unresolved finding" "$F"
+    ! grep -q "degraded-pass" "$F"
+  done
+
   F="$ROOT/content/agent-skills/work-beads/SKILL.md"
   grep -q "severity label never creates a bead" "$F"
   grep -q "reproducible, actionable, non-duplicate, worth scheduling" "$F"
   grep -q "exactly one finite disposition" "$F"
-  ! grep -q "files beads for P2/P3" "$F"
-  ! grep -q "file a bead per unresolved finding" "$F"
 }
 
 @test "agent templates inherit the finite review disposition policy" {
@@ -101,6 +109,20 @@ ROOT="$BATS_TEST_DIRNAME/.."
     "$ROOT/content/pipeline/environment/git-workflow.md"; do
     grep -q "Severity alone never creates" "$F"
     grep -Eq "acceptance-criteria|acceptance criteria" "$F"
+  done
+}
+
+@test "review policy surfaces share safeguards and terminal behavior" {
+  for F in \
+    "$ROOT/content/agent-skills/work-beads/SKILL.md" \
+    "$ROOT/content/skills/work-beads/SKILL.md" \
+    "$ROOT/content/pipeline/environment/automated-pr-review.md" \
+    "$ROOT/content/pipeline/environment/git-workflow.md"; do
+    NORMALIZED="$(tr '\n' ' ' < "$F" | sed -E 's/[[:space:]]+/ /g')"
+    [[ "$NORMALIZED" == *"every root cause has a disposition and no verified fix-now or block item remains"* ]]
+    [[ "$NORMALIZED" == *"security, privacy, and data integrity"* ]]
+    [[ "$NORMALIZED" == *"keep the PR open"* ]]
+    [[ "$NORMALIZED" == *"end the batch without merging"* ]]
   done
 }
 
