@@ -92,9 +92,12 @@ ROOT="$BATS_TEST_DIRNAME/.."
     "$ROOT/content/skills/work-beads/SKILL.md" \
     "$ROOT/content/pipeline/environment/automated-pr-review.md" \
     "$ROOT/content/pipeline/environment/git-workflow.md"; do
-    ! grep -q "files beads for P2/P3" "$F"
-    ! grep -q "file a bead per unresolved finding" "$F"
-    ! grep -q "degraded-pass" "$F"
+    if grep -q "files beads for P2/P3" "$F" || \
+      grep -q "file a bead per unresolved finding" "$F" || \
+      grep -q "degraded-pass" "$F"; then
+      echo "retired review policy found in $F"
+      return 1
+    fi
   done
 
   F="$ROOT/content/agent-skills/work-beads/SKILL.md"
@@ -119,11 +122,24 @@ ROOT="$BATS_TEST_DIRNAME/.."
     "$ROOT/content/pipeline/environment/automated-pr-review.md" \
     "$ROOT/content/pipeline/environment/git-workflow.md"; do
     NORMALIZED="$(tr '\n' ' ' < "$F" | sed -E 's/[[:space:]]+/ /g')"
-    [[ "$NORMALIZED" == *"every root cause has a disposition and no verified fix-now or block item remains"* ]]
-    [[ "$NORMALIZED" == *"security, privacy, and data integrity"* ]]
-    [[ "$NORMALIZED" == *"keep the PR open"* ]]
-    [[ "$NORMALIZED" == *"end the batch without merging"* ]]
+    for REQUIRED in \
+      "every root cause has a disposition and no verified fix-now or block item remains" \
+      "security, privacy, and data integrity" \
+      "A verified block ends review immediately" \
+      "keep the PR open" \
+      "end the batch without merging"; do
+      if [[ "$NORMALIZED" != *"$REQUIRED"* ]]; then
+        echo "missing '$REQUIRED' in $F"
+        return 1
+      fi
+    done
   done
+}
+
+@test "living content drops the retired recursive review path" {
+  ! rg -q -i \
+    'degraded-pass (self-merge|past the cap)|files beads for P2/P3|file a bead per unresolved finding' \
+    "$ROOT/content"
 }
 
 # NOTE: work-beads skill drift (canonical content/agent-skills → generated

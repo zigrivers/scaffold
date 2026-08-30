@@ -392,10 +392,13 @@ fast on a saturated machine: `taskpolicy -c utility make check-affected`
 - Hard cap: 3 rounds. Review stops when every root cause has a disposition and
   no verified fix-now or block item remains. Do not rerun review merely to
   clear suggestions, and do not create tasks from review-task review metadata.
-- Review always ends after round 3. At the cap, if a verified fix-now or block
-  item remains, keep the PR open, post the disposition ledger and reproduction,
-  notify the user, and end the batch without merging. Otherwise proceed once all
-  required checks pass.
+- A verified block ends review immediately. Keep the PR open, post the
+  disposition ledger and reproduction, notify the user, and end the batch
+  without merging; do not spend the remaining review rounds.
+- Review always ends after round 3. At the cap, if a verified fix-now item
+  remains, keep the PR open, post the ledger and reproduction, notify the user,
+  and end the batch without merging. Otherwise proceed once all required checks
+  pass.
 - A verified acceptance-criteria or mandatory-guardrail defect blocks merge
   regardless of its model-assigned severity. A follow-up bead cannot make the
   current PR safe.

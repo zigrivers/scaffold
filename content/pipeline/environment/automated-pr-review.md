@@ -26,11 +26,12 @@ product safeguard required by project instructions.
 Reconcile findings by root cause into `fix-now`, `block`, `reject:<reason>`,
 or `follow-up:<bead-id>`. Severity alone never creates backlog work. A
 follow-up must be reproducible, actionable, non-duplicate, worth scheduling,
-and outside the current PR's required scope. Review stops after at most three
-rounds. Review stops when every root cause has a disposition and no verified
-fix-now or block item remains. At the cap, if either remains, keep the PR open,
-post the ledger and reproduction, notify the user, and end the batch without
-merging.
+and outside the current PR's required scope. Review stops when every root cause
+has a disposition and no verified fix-now or block item remains; otherwise it
+ends after three rounds. A verified block ends review immediately. Keep the PR
+open, post the ledger and reproduction, notify the user, and end the batch
+without merging. At the cap, use the same keep-open exit for a verified fix-now
+item that remains.
 Channel auth failures are always surfaced to the user with recovery
 commands — never silently skipped. When the target project has `scaffold`
 itself available, `scaffold run review-pr` and `scaffold run review-code`
@@ -201,7 +202,7 @@ overwrite or drop unrelated hooks):
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '.tool_input.command // empty' | grep -q 'gh pr create' && echo 'MANDATORY: run mmr review --pr <PR#> --sync --format json before moving on.\\nGroup duplicate findings by root cause and record one disposition: fix-now, block, reject:<reason>, or follow-up:<bead-id>. Severity alone never creates a bead. Follow-up work requires all five gates: reproducible, actionable, non-duplicate, worth scheduling, and outside scope.\\nMandatory guardrails include at minimum security, privacy, and data integrity, plus every repository or product safeguard required by project instructions.\\nHard cap 3 rounds: review stops when every root cause has a disposition and no verified fix-now or block item remains. At the cap, if either remains, keep the PR open, post the ledger and reproduction, notify the user, and end the batch without merging.\\nSurface channel auth failures with recovery commands (! codex login / ! agy -p \"hello\" / ! claude login) — never silently skip a channel.\\nSee docs/review-standards.md.' || true"
+            "command": "jq -r '.tool_input.command // empty' | grep -q 'gh pr create' && echo 'MANDATORY: run mmr review --pr <PR#> --sync --format json before moving on.\\nGroup duplicate findings by root cause and record one disposition: fix-now, block, reject:<reason>, or follow-up:<bead-id>. Severity alone never creates a bead. Follow-up work requires all five gates: reproducible, actionable, non-duplicate, worth scheduling, and outside scope.\\nMandatory guardrails include at minimum security, privacy, and data integrity, plus every repository or product safeguard required by project instructions.\\nHard cap 3 rounds: review stops when every root cause has a disposition and no verified fix-now or block item remains. A verified block ends review immediately: keep the PR open, post the ledger and reproduction, notify the user, and end the batch without merging. At the cap, use the same keep-open exit for a verified fix-now item that remains.\\nSurface channel auth failures with recovery commands (! codex login / ! agy -p \"hello\" / ! claude login) — never silently skip a channel.\\nSee docs/review-standards.md.' || true"
           }
         ]
       }
@@ -244,11 +245,12 @@ actionable, non-duplicate, worth scheduling, and outside scope. Mandatory
 guardrails include at minimum security, privacy, and data integrity (including
 preventing data loss or corruption), plus every repository or product safeguard
 required by project instructions. Hard cap 3 rounds: review stops when every
-root cause has a disposition and no verified fix-now or block item remains. At
-the cap, if either remains, keep the PR open, post the ledger and reproduction,
-notify the user, and end the batch without merging. Surface channel auth failures
-to the user with recovery commands; never silently skip a channel. A post-hook on
-`gh pr create` will remind you.
+root cause has a disposition and no verified fix-now or block item remains. A
+verified block ends review immediately. Keep the PR open, post the ledger and
+reproduction, notify the user, and end the batch without merging. At the cap,
+use the same keep-open exit for a verified fix-now item that remains. Surface
+channel auth failures to the user with recovery commands; never silently skip a
+channel. A post-hook on `gh pr create` will remind you.
 
 **Optional but supported** for non-PR targets — the review is not PR-gated.
 `mmr review` runs the three CLI channels (Codex, Antigravity, Claude) on any

@@ -374,9 +374,10 @@ Depth-gate per Methodology Scaling above.
    integrity (including preventing data loss or corruption), plus every
    repository or product safeguard required by project instructions. Hard cap
    3 rounds: review stops when every root cause has a disposition and no
-   verified fix-now or block item remains. At the cap, if either remains, keep
-   the PR open, post the ledger and reproduction, notify the user, and end the
-   batch without merging) ->
+   verified fix-now or block item remains. A verified block ends review
+   immediately: keep the PR open, post the ledger and reproduction, notify the
+   user, and end the batch without merging. At the cap, use the same keep-open
+   exit for a verified fix-now item that remains) ->
    (6) confirm the fast
    gate green on the branch HEAD (`make check-affected`; run full `make
    check` instead when you touched gate config, shared test utils, or

@@ -190,9 +190,10 @@ order:
       push — the draft is the visible claim.
    5. Verify: `make check` green on branch HEAD, personally watched.
    6. Review + enqueue: `mmr review --pr <N> --sync --format json` (3-round
-      cap, degraded-pass past the cap), then `make mq-enqueue PR=<N>` and move
-      on — the queue lands or ejects; NEVER `gh pr merge` directly (mq-guard
-      blocks it). Fallback without the queue: merge-slot-serialized
+      cap; a verified block ends review immediately and keeps the PR open), then
+      `make mq-enqueue PR=<N>` only when no verified fix-now or block item
+      remains — the queue lands or ejects; NEVER `gh pr merge` directly
+      (mq-guard blocks it). Fallback without the queue: merge-slot-serialized
       `gh pr merge --squash --delete-branch`; `make main-sync && make
       prune-merged`.
    7. Close-out: on the queue path the DAEMON closes the bead when the PR
