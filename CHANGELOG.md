@@ -14,7 +14,8 @@ All notable changes to Scaffold are documented here.
   cannot restart review, and merge still requires a reviewed exact head with no
   verified blocker. Evidence-backed refutations use an exact-match,
   review-job-only disposition instead of a persistent cross-project
-  acknowledgment.
+  acknowledgment. A config/ack trust-gate stop now returns exit 3
+  (`needs-user-decision`) instead of exit 2 (`blocked`), matching its verdict.
 
 ## [3.54.1] - 2026-08-30
 

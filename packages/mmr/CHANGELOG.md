@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- The pre-dispatch config/ack trust gate now exits 3
+  (`needs-user-decision`) instead of 2 (`blocked`), matching the verdict and
+  the documented exit-code contract.
+
 ### Removed
 
 - **`stage: prototype | mvp | production` is withdrawn before ever shipping.**

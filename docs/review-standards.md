@@ -94,7 +94,7 @@ you do dismiss one, say why in the review summary.
 | `pass` | 0 | all channels completed, gate passed | proceed (merge / commit / push) |
 | `degraded-pass` | 0 | gate passed, at least `min_completed_channels` reported, but a channel was skipped or compensated | proceed; note the degradation |
 | `blocked` | 2 | an unresolved finding sits at or above the threshold | fix it in the current cycle; at round three apply the bounded-cycle rule above |
-| `needs-user-decision` | 3 | no channel completed, **too few channels completed to corroborate**, the reviewed diff proposes an untrusted project configuration or persistent acknowledgment change, or the cycle reached its round cap | restore the floor, ratify only verified persistent trust changes, or apply the bounded-cycle and stopping rules above |
+| `needs-user-decision` | 3 | no channel completed, **too few channels completed to corroborate**, the reviewed diff proposes an untrusted project configuration or persistent acknowledgment change, or an attempted review exceeds the cycle round cap | restore the floor, ratify only verified persistent trust changes, or apply the bounded-cycle and stopping rules above |
 
 Never merge on `blocked` or `needs-user-decision`. Cross-check each finding's
 `location` against the reviewed diff's file list (`gh pr diff <n> --name-only`

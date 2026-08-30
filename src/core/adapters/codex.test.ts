@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import { spawnSync } from 'node:child_process'
 import { CodexAdapter } from './codex.js'
 import type { AdapterContext, AdapterStepInput, AdapterFinalizeInput, AdapterStepOutput } from './adapter.js'
 
@@ -172,9 +173,13 @@ describe('CodexAdapter', () => {
       // Direct mmr review invocations are present
       expect(content).toContain('mmr review --staged')
       expect(content).toContain('mmr review --diff -')
-      expect(content).toContain('CYCLE="${CYCLE:-1}"')
+      expect(content).not.toContain('CYCLE="${CYCLE:-1}"')
       expect(content).toContain('--session "$SESSION_ID-cycle-$CYCLE"')
       expect(content).toContain('--round "$ROUND" --max-rounds 3')
+      expect(content).toContain('mmr sessions list')
+      expect(content).toContain('mmr sessions show')
+      expect(content).toMatch(/latest cycle reached round 3/i)
+      expect(content).toMatch(/set both CYCLE and ROUND/i)
       expect(content).toMatch(/new exact head/i)
 
       // BASE_REF resolution mirrors content/tools/review-code.md (7-level ladder)
@@ -223,14 +228,61 @@ describe('CodexAdapter', () => {
 
       // Each remediation cycle keeps MMR's native three-round cap while a
       // verified in-scope repair can restart at round one on the same PR.
-      expect(content).toContain('CYCLE="${CYCLE:-1}"')
+      expect(content).not.toContain('CYCLE="${CYCLE:-1}"')
       expect(content).toContain('--session "pr-$PR_NUMBER-cycle-$CYCLE"')
       expect(content).toContain('--round "$ROUND" --max-rounds 3')
+      expect(content).toContain('mmr sessions list')
+      expect(content).toContain('mmr sessions show')
+      expect(content).toMatch(/latest cycle reached round 3/i)
+      expect(content).toMatch(/set both CYCLE and ROUND/i)
       expect(content).toMatch(/concrete repair.*focused\s+regression.*required\s+gate/is)
       expect(content).toMatch(/Duplicate, stale, hypothetical, speculative,\s+cosmetic, or already-dispositioned/)
 
       // No reconcile claim
       expect(content).not.toContain('mmr reconcile')
+    })
+
+    it('review-pr resumes the latest bounded session and fails closed after round three', () => {
+      adapter.initialize(makeContext())
+      adapter.generateStepWrapper(makeStepInput({ slug: 'review-pr', phase: null }))
+      const content = adapter.finalize(makeFinalizeInput([])).files[0].content
+      const recipe = content.match(/```bash\n([\s\S]*?)\n```/)?.[1]
+      expect(recipe).toBeDefined()
+
+      const script = `
+mmr() {
+  if [ "$1 $2" = "sessions list" ]; then printf '%s' "$MMR_SESSIONS"
+  elif [ "$1 $2" = "sessions show" ]; then printf '%s' "$MMR_SESSION"
+  elif [ "$1" = "review" ]; then printf 'REVIEW %s\\n' "$*"
+  else return 1
+  fi
+}
+${recipe}
+`
+      const run = (sessions: string, session: string, extraEnv: Record<string, string> = {}) =>
+        spawnSync('/bin/bash', ['-c', script], {
+          encoding: 'utf8',
+          env: { ...process.env, PR_NUMBER: '42', MMR_SESSIONS: sessions, MMR_SESSION: session, ...extraEnv },
+        })
+
+      const resumed = run(
+        JSON.stringify([{ session_id: 'pr-42-cycle-2', rounds: 1 }]),
+        JSON.stringify({ session_id: 'pr-42-cycle-2', rounds: 1 }),
+      )
+      expect(resumed.status).toBe(0)
+      expect(resumed.stdout).toContain('--session pr-42-cycle-2 --round 2 --max-rounds 3')
+
+      const capped = run(
+        JSON.stringify([{ session_id: 'pr-42-cycle-2', rounds: 3 }]),
+        JSON.stringify({ session_id: 'pr-42-cycle-2', rounds: 3 }),
+      )
+      expect(capped.status).toBe(1)
+      expect(capped.stderr).toMatch(/latest cycle reached round 3/i)
+      expect(capped.stdout).not.toContain('REVIEW')
+
+      const restarted = run('[]', '{}', { CYCLE: '3', ROUND: '1' })
+      expect(restarted.status).toBe(0)
+      expect(restarted.stdout).toContain('--session pr-42-cycle-3 --round 1 --max-rounds 3')
     })
 
     it('non-executor tools still use `scaffold run <slug>`', () => {
