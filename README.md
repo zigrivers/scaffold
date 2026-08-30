@@ -161,7 +161,7 @@ This gives you five skills:
 - **Pipeline reference skill** — shows pipeline ordering, dependencies, and phase structure
 - **Multi-model dispatch skill** — correct invocation patterns for Codex and Antigravity CLIs
 - **MMR skill** — runs `mmr review` before merging, and `mmr critique` for design review
-- **Work-beads skill** — works the project's Beads task queue end to end (claim → worktree → build → verify → review → merge → close). The original bead and required guardrails bound review scope; each finding gets one finite disposition, and a follow-up is created only when it is reproducible, actionable, non-duplicate, worth scheduling, and outside that scope. Severity alone never creates a bead, while required defects still block merge and review stops after at most three rounds.
+- **Work-beads skill** — works the project's Beads task queue end to end (claim → worktree → build → verify → bounded review → merge → close)
 
 **Usage** — just tell Claude Code what you want in natural language:
 ```
