@@ -189,7 +189,7 @@ findings cannot start a new cycle. Do not dispatch extra rounds for a
 cosmetically clean model response.
 
 If a verified `reject:<reason>` still blocks MMR, record the evidence, run `mmr
-ack add <finding-key> --job <job-id> --scope user --reason "reject: <evidence>"`,
+ack add <finding-key> --job <job-id> --scope job --reason "reject: <evidence>"`,
 then recompute with `mmr results <job-id>`. Never acknowledge a verified
 `fix-now` or `block`. Stop when the user asks to stop; otherwise stop only for a
 true external dependency, missing credentials or authority, a destructive

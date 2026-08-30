@@ -391,7 +391,7 @@ fast on a saturated machine: `taskpolicy -c utility make check-affected`
 - Group repeated findings by root cause. Record exactly one finite disposition:
   `fix-now`, `block`, `reject:<reason>`, or `follow-up:<bead-id>`.
 - If a verified `reject:<reason>` still blocks MMR, copy the evidence to the PR
-  ledger, run `mmr ack add <finding-key> --job <job-id> --scope user --reason
+  ledger, run `mmr ack add <finding-key> --job <job-id> --scope job --reason
   "reject: <evidence>"`, then recompute with `mmr results <job-id>`. Never
   acknowledge a verified `fix-now` or `block`.
 - A model's severity label never creates a bead. Create one follow-up per root cause

@@ -46,10 +46,12 @@ the decision.
 
 MMR still gates on unacknowledged threshold findings. For a verified refutation,
 duplicate, or stale finding, copy the evidence into the PR disposition ledger,
-then run `mmr ack add <finding-key> --job <job-id> --scope user --reason
+then run `mmr ack add <finding-key> --job <job-id> --scope job --reason
 "reject: <evidence>"` and recompute with `mmr results <job-id>`. The finding stays
-visible but no longer blocks. Never acknowledge a verified `fix-now` or `block`
-item, and never use an acknowledgment to hide a required-safeguard defect.
+visible but no longer blocks that immutable review job. Use `--scope job`, never
+the persistent project or user scopes, for an agent disposition. Never
+acknowledge a verified `fix-now` or `block` item, and never use an acknowledgment
+to hide a required-safeguard defect.
 
 At round three, a reproducible defect within the original acceptance criteria
 or a required safeguard may start a new bounded cycle on the same PR only after
@@ -65,12 +67,13 @@ A reworded recurrence without a materially new, reproducible defect is duplicate
 suggestion churn and cannot restart a cycle.
 
 Continue bounded remediation until every root cause has a disposition and no
-verified fix-now or block item remains. No owner approval is required for an
-safeguard defect is not a plateau; keep repairing it. Stop when the user asks to
-stop. Otherwise stop only for a true external dependency, missing credentials or
-authority, a destructive action, a material product decision outside the
-acceptance criteria, or a demonstrated technical plateau after safe approaches
-are exhausted. Record exact evidence for the stop. Required
+verified fix-now or block item remains. No owner approval is required for
+in-scope remediation. An unresolved required safeguard defect is not a plateau;
+keep repairing it. Stop when the user asks to stop. Otherwise stop only for a
+true external dependency, missing credentials or authority, a destructive
+action, a material product decision outside the acceptance criteria, or a
+demonstrated technical plateau after safe approaches are exhausted. Record exact
+evidence for the stop. Required
 safeguards include security, privacy, and data integrity, plus accessibility and
 every repository or product safeguard named by project instructions.
 
@@ -89,7 +92,7 @@ you do dismiss one, say why in the review summary.
 | `pass` | 0 | all channels completed, gate passed | proceed (merge / commit / push) |
 | `degraded-pass` | 0 | gate passed, at least `min_completed_channels` reported, but a channel was skipped or compensated | proceed; note the degradation |
 | `blocked` | 2 | an unresolved finding sits at or above the threshold | fix it in the current cycle; at round three apply the bounded-cycle rule above |
-| `needs-user-decision` | 3 | no channel completed, **too few channels completed to corroborate**, an untrusted review configuration or acknowledgment changed, or the cycle reached its round cap | restore the floor, ratify only verified trust changes, or apply the bounded-cycle and stopping rules above |
+| `needs-user-decision` | 3 | no channel completed, **too few channels completed to corroborate**, an untrusted project configuration or persistent acknowledgment changed, or the cycle reached its round cap | restore the floor, ratify only verified persistent trust changes, or apply the bounded-cycle and stopping rules above |
 
 Never merge on `blocked` or `needs-user-decision`. Cross-check each finding's
 `location` against the reviewed diff's file list (`gh pr diff <n> --name-only`

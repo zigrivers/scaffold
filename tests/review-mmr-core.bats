@@ -130,16 +130,33 @@ ROOT="$BATS_TEST_DIRNAME/.."
 @test "review policy preserves user stop and records evidence-backed refutations" {
   F="$ROOT/docs/review-standards.md"
   NORMALIZED="$(tr '\n' ' ' < "$F" | sed -E 's/[[:space:]]+/ /g')"
-  [[ "$NORMALIZED" == *"the user asks to stop"* ]]
-  [[ "$NORMALIZED" == *"mmr ack add"* ]]
-  [[ "$NORMALIZED" == *"mmr results"* ]]
-  [[ "$NORMALIZED" == *"Never acknowledge a verified"* ]]
+  [[ "$NORMALIZED" == *"the user asks to stop"* ]] || false
+  [[ "$NORMALIZED" == *"No owner approval is required for in-scope remediation"* ]] || false
+  [[ "$NORMALIZED" == *"mmr ack add"* ]] || false
+  [[ "$NORMALIZED" == *"--scope job"* ]] || false
+  [[ "$NORMALIZED" != *"--scope user"* ]] || false
+  [[ "$NORMALIZED" == *"mmr results"* ]] || false
+  [[ "$NORMALIZED" == *"Never acknowledge a verified"* ]] || false
+}
+
+@test "every shipped MMR skill teaches job-scoped evidence-backed refutations" {
+  for F in \
+    "$ROOT/content/agent-skills/mmr/SKILL.md" \
+    "$ROOT/content/skills/mmr/SKILL.md" \
+    "$ROOT/packages/mmr/templates/skills/agents/mmr-review.md" \
+    "$ROOT/packages/mmr/templates/skills/cursor/mmr-review.mdc" \
+    "$ROOT/packages/mmr/templates/skills/opencode/mmr.md"; do
+    NORMALIZED="$(tr '\n' ' ' < "$F" | sed -E 's/[[:space:]]+/ /g')"
+    [[ "$NORMALIZED" == *"--scope job"* ]] || false
+    [[ "$NORMALIZED" != *"--scope user"* ]] || false
+    [[ "$NORMALIZED" == *"Never acknowledge a verified"* ]] || false
+  done
 }
 
 @test "inconclusive findings receive a finite non-restart disposition" {
   F="$ROOT/content/knowledge/core/multi-model-review-dispatch.md"
   NORMALIZED="$(tr '\n' ' ' < "$F" | sed -E 's/[[:space:]]+/ /g')"
-  [[ "$NORMALIZED" == *"inconclusive"* ]]
-  [[ "$NORMALIZED" == *"cannot restart a cycle"* ]]
-  [[ "$NORMALIZED" == *"required safeguard"* ]]
+  [[ "$NORMALIZED" == *"inconclusive"* ]] || false
+  [[ "$NORMALIZED" == *"cannot restart a cycle"* ]] || false
+  [[ "$NORMALIZED" == *"required safeguard"* ]] || false
 }

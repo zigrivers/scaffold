@@ -12,7 +12,9 @@ All notable changes to Scaffold are documented here.
   after a concrete repair, focused regression proof, and the required gate.
   Duplicate, stale, speculative, cosmetic, and already-dispositioned findings
   cannot restart review, and merge still requires a reviewed exact head with no
-  verified blocker.
+  verified blocker. Evidence-backed refutations use an exact-match,
+  review-job-only disposition instead of a persistent cross-project
+  acknowledgment.
 
 ## [3.54.1] - 2026-08-30
 

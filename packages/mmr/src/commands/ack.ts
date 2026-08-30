@@ -74,17 +74,37 @@ export const ackCommand: CommandModule<object, AckArgs> = {
       .option('reason', { type: 'string', describe: 'Why this finding is being acked' })
       .option('scope', {
         type: 'string',
-        choices: ['project', 'user'] as const,
+        choices: ['project', 'user', 'job'] as const,
         default: 'project',
-        describe: 'Scope of the ack (project=./.mmr/acks, user=~/.mmr/acks)',
+        describe: 'Scope (project=./.mmr/acks, user=~/.mmr/acks, job=<job>/acks)',
       }),
   handler: (args: ArgumentsCamelCase<AckArgs>) => {
-    // The ack CLI is operator-driven on a trusted machine, so it manages both
-    // project and user scopes directly (unlike the review gate, which gates
+    // The ack CLI is operator-driven on a trusted machine, so it manages all
+    // three scopes directly (unlike the review gate, which gates persistent
     // project acks behind trust). Scope selection is explicit via --scope.
     // Project root is discovered from cwd (works from a subdirectory); user
     // acks live under the MMR state root (resolveSessionRoot(), MMR_HOME-aware).
-    const ackStore = new AckStore({ projectRoot: findProjectRoot(), userRoot: resolveSessionRoot() })
+    if (args.job !== undefined && !JOB_ID_RE.test(args.job)) {
+      console.error(`Invalid job id: ${args.job} — must match ^mmr-[a-f0-9]{12}$`)
+      process.exit(1)
+    }
+    const scope = (args.scope ?? 'project') as AckScope
+    if (scope === 'job' && args.job === undefined) {
+      console.error('Job-scoped acknowledgments require --job <id>.')
+      process.exit(1)
+    }
+    const reason = args.reason?.trim()
+    if (scope === 'job' && args.action === 'add'
+      && (!reason?.startsWith('reject:') || reason.slice('reject:'.length).trim() === '')) {
+      console.error('Job-scoped acknowledgments require --reason "reject: <evidence>".')
+      process.exit(1)
+    }
+    const jobStore = new JobStore(resolveJobsDir())
+    const ackStore = new AckStore({
+      projectRoot: findProjectRoot(),
+      userRoot: resolveSessionRoot(),
+      jobRoot: args.job === undefined ? undefined : jobStore.getJobDir(args.job),
+    })
 
     if (args.action === 'list') {
       console.log(JSON.stringify(ackStore.listAll(), null, 2))
@@ -107,25 +127,14 @@ export const ackCommand: CommandModule<object, AckArgs> = {
       process.exit(1)
     }
 
-    const scope = (args.scope ?? 'project') as AckScope
-
     if (args.action === 'rm') {
       ackStore.remove(key, scope)
-      console.log(JSON.stringify({ removed: key, scope }, null, 2))
+      console.log(JSON.stringify({ removed: key, scope, ...(scope === 'job' ? { job: args.job } : {}) }, null, 2))
       return
-    }
-
-    // Validate the optional --job hint before any path construction, mirroring
-    // the finding_key check (getJobDir also guards against escape, but reject
-    // early here for a clear operator error).
-    if (args.job !== undefined && !JOB_ID_RE.test(args.job)) {
-      console.error(`Invalid job id: ${args.job} — must match ^mmr-[a-f0-9]{12}$`)
-      process.exit(1)
     }
 
     // add: need a source finding to capture location + shingle. Jobs live under
     // the MMR root (honors MMR_HOME), same as where review writes them.
-    const jobStore = new JobStore(resolveJobsDir())
     const src = findSourceFinding(jobStore, key, args.job)
     if (!src) {
       const where = args.job ? ` (job=${args.job})` : ''
@@ -142,6 +151,6 @@ export const ackCommand: CommandModule<object, AckArgs> = {
       created_at: new Date().toISOString(),
     }
     ackStore.add(record, scope)
-    console.log(JSON.stringify({ added: key, scope }, null, 2))
+    console.log(JSON.stringify({ added: key, scope, ...(scope === 'job' ? { job: args.job } : {}) }, null, 2))
   },
 }

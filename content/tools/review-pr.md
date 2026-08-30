@@ -146,7 +146,7 @@ response.
 Use evidence to reproduce, refute, deduplicate, classify, and disposition every
 finding; a model's severity label alone does not decide. If a verified
 `reject:<reason>` still blocks MMR, copy the evidence to the PR disposition
-ledger, run `mmr ack add <finding-key> --job <job-id> --scope user --reason
+ledger, run `mmr ack add <finding-key> --job <job-id> --scope job --reason
 "reject: <evidence>"`, then recompute with `mmr results <job-id>`. Never
 acknowledge a verified `fix-now` or `block`. Stop when the user asks to stop;
 otherwise stop only for a true external dependency, missing credentials or

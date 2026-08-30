@@ -70,6 +70,12 @@ credentials or authority, a destructive action, an out-of-scope material
 product decision, or a demonstrated technical plateau. An unresolved required
 safeguard is not a plateau.
 
+For a verified refutation, duplicate, or stale finding that still blocks the
+verdict, record the evidence in the review ledger, run `mmr ack add <finding-key>
+--job <id> --scope job --reason "reject: <evidence>"`, then recompute with `mmr
+results <id>`. The disposition applies only to that immutable review job. Never
+acknowledge a verified `fix-now`, `block`, or required-safeguard defect.
+
 ## Async flow (without `--sync`)
 
 `mmr review …` prints a job id → `mmr status <job-id>` until complete →
@@ -156,12 +162,6 @@ mmr sessions list                      # iterative sessions (also: start | show 
 rounds (manage them with `mmr sessions`); `mmr reconcile` injects an external
 channel's findings (e.g. an agent reviewer) into an existing job so they
 reconcile with the CLI channels.
-
-For a verified refutation, duplicate, or stale finding that still blocks the
-verdict, record the evidence in the review ledger, run `mmr ack add <finding-key>
---job <id> --scope user --reason "reject: <evidence>"`, then recompute with `mmr
-results <id>`. Never acknowledge a verified `fix-now`, `block`, or required-
-safeguard defect.
 
 ## Configuring channels
 

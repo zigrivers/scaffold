@@ -192,6 +192,10 @@ describe('CodexAdapter', () => {
       expect(content).toMatch(/\*\*Mode 1\b/)
       expect(content).toMatch(/\*\*Mode 2\b/)
       expect(content).toMatch(/\*\*Mode 3\b/)
+      expect(content).toContain('printf \'%s\' "$BRANCH_NAME"')
+      expect(content).toContain('--head "$BRANCH_NAME"')
+      expect(content).not.toContain('printf \'%s\' BRANCH_NAME')
+      expect(content.match(/\[ "\$BRANCH" = "HEAD" \]/g)).toHaveLength(2)
 
       // No reconcile claim — Codex can't dispatch the Superpowers skill
       expect(content).not.toContain('mmr reconcile')

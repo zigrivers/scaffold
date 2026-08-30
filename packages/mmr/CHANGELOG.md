@@ -56,6 +56,11 @@
 
 ### Added
 
+- **Job-scoped review dispositions.** `mmr ack add <key> --job <id> --scope
+  job --reason "reject: <evidence>"` stores an exact-match acknowledgment inside
+  one immutable review job. It cannot suppress a similar finding in another
+  review or repository, and the job scope requires both the job id and reason.
+
 - **The finding-quality harness can now compare two MMR builds** (`scripts/`,
   not shipped in the published package). Its only treatment mechanism was a
   candidate `.mmr.yaml`, which by design may set only `version` and

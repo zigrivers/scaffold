@@ -221,7 +221,7 @@ When models actively disagree (one flags an issue, another says the same thing i
 3. **Resolve from evidence, not labels.** Reproduce, refute, or identify the
    missing evidence. A model's severity label alone never controls the decision.
    If reasonable reproduction remains inconclusive, record `reject:unverifiable`
-   with the missing evidence and do not let it restart a cycle. If the uncertainty
+   with the missing evidence; it cannot restart a cycle. If the uncertainty
    concerns a required safeguard, keep investigating or stop on the concrete
    external dependency; never dismiss the safeguard as unverifiable.
 4. **Document the disagreement.** The reconciliation report should note: "Models disagreed on [topic]. Resolution: [decision and rationale]."

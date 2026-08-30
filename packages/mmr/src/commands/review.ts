@@ -840,6 +840,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       const ackStore = buildReviewAckStore({
         trustProjectAcks: honorWorkingTreeAcks,
         userRoot: resolveSessionRoot(),
+        jobRoot: store.getJobDir(completedJob.job_id),
         configBaseRef: baseRef,
         cwd,
       })

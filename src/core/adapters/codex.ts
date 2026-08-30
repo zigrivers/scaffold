@@ -82,6 +82,7 @@ git diff "$MERGE_BASE" | mmr review --diff - "\${MMR_FLAGS[@]}"
 
 \`\`\`bash
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+[ "$BRANCH" = "HEAD" ] && BRANCH="detached-$(git rev-parse --short HEAD 2>/dev/null)"
 SESSION_ID="local-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
 CYCLE="\${CYCLE:-1}"
 ROUND="\${ROUND:-1}"
@@ -92,10 +93,11 @@ mmr review --staged --session "$SESSION_ID-cycle-$CYCLE" --round "$ROUND" --max-
 \`BRANCH_NAME\`):
 
 \`\`\`bash
-SESSION_ID="local-$(printf '%s' BRANCH_NAME | tr -c 'a-zA-Z0-9_-' '-')"
+BRANCH_NAME="<branch-name>"
+SESSION_ID="local-$(printf '%s' "$BRANCH_NAME" | tr -c 'a-zA-Z0-9_-' '-')"
 CYCLE="\${CYCLE:-1}"
 ROUND="\${ROUND:-1}"
-mmr review --base main --head BRANCH_NAME --session "$SESSION_ID-cycle-$CYCLE" \
+mmr review --base main --head "$BRANCH_NAME" --session "$SESSION_ID-cycle-$CYCLE" \
   --round "$ROUND" --max-rounds 3 --sync --format json
 \`\`\`
 

@@ -35,7 +35,7 @@ round one in a new bounded cycle. Duplicate, stale, hypothetical, speculative,
 cosmetic, or already-dispositioned findings cannot restart review. No owner
 approval is required for in-scope remediation. For a verified rejection that
 still blocks MMR, record the evidence, use `mmr ack add <finding-key> --job
-<job-id> --scope user --reason "reject: <evidence>"`, then recompute with `mmr
+<job-id> --scope job --reason "reject: <evidence>"`, then recompute with `mmr
 results <job-id>`; never acknowledge a verified blocker. Stop when the user asks
 to stop. Otherwise stop only for an external dependency, missing credentials or
 authority, a destructive action, an out-of-scope material product decision, or

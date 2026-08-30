@@ -43,6 +43,21 @@ function runAck(args: Record<string, unknown>, dirs: { home: string; cwd: string
 }
 
 describe('mmr ack CLI', () => {
+  const JOB_ID = `mmr-${'b'.repeat(12)}`
+  const FINDING_KEY = 'a'.repeat(40)
+
+  function writeSourceFinding(home: string): void {
+    const jobDir = path.join(home, '.mmr', 'jobs', JOB_ID)
+    fs.mkdirSync(jobDir, { recursive: true })
+    fs.writeFileSync(path.join(jobDir, 'results.json'), JSON.stringify({
+      reconciled_findings: [{
+        finding_key: FINDING_KEY,
+        location: 'src/foo.ts:10',
+        description_shingle: ['hello', 'ello '],
+      }],
+    }))
+  }
+
   it('rejects an invalid finding-key BEFORE constructing a path', () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-ack-cli-'))
     const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-ack-proj-'))
@@ -79,6 +94,48 @@ describe('mmr ack CLI', () => {
       const { out, exited } = runAck({ action: 'list' }, { home, cwd })
       expect(exited).toBeUndefined()
       expect(JSON.parse(out.join('\n'))).toEqual([])
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true })
+      fs.rmSync(cwd, { recursive: true, force: true })
+    }
+  })
+
+  it('stores a job-scoped rejection only inside the named review job', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-ack-cli-'))
+    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-ack-proj-'))
+    try {
+      writeSourceFinding(home)
+      const { out, exited } = runAck({
+        action: 'add',
+        'finding-key': FINDING_KEY,
+        job: JOB_ID,
+        scope: 'job',
+        reason: 'reject: verified duplicate',
+      }, { home, cwd })
+      expect(exited).toBeUndefined()
+      expect(JSON.parse(out.join('\n'))).toMatchObject({ added: FINDING_KEY, scope: 'job', job: JOB_ID })
+      expect(fs.existsSync(path.join(home, '.mmr', 'jobs', JOB_ID, 'acks', `${FINDING_KEY}.json`))).toBe(true)
+      expect(fs.existsSync(path.join(home, '.mmr', 'acks', `${FINDING_KEY}.json`))).toBe(false)
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true })
+      fs.rmSync(cwd, { recursive: true, force: true })
+    }
+  })
+
+  it('requires a reason when a job-scoped rejection is added', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-ack-cli-'))
+    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-ack-proj-'))
+    try {
+      writeSourceFinding(home)
+      const { err, exited } = runAck({
+        action: 'add',
+        'finding-key': FINDING_KEY,
+        job: JOB_ID,
+        scope: 'job',
+      }, { home, cwd })
+      expect(exited).toBe(1)
+      expect(err.join('\n')).toMatch(/job-scoped.*reason/i)
+      expect(fs.existsSync(path.join(home, '.mmr', 'jobs', JOB_ID, 'acks', `${FINDING_KEY}.json`))).toBe(false)
     } finally {
       fs.rmSync(home, { recursive: true, force: true })
       fs.rmSync(cwd, { recursive: true, force: true })
