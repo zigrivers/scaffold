@@ -4,6 +4,25 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.54.1] - 2026-08-30
+
+Bounded review-follow-up release. Multi-model review remains mandatory, but
+reviewer suggestions can no longer grow a Beads backlog without evidence.
+
+### Fixed
+
+- **The original bead, its acceptance criteria, and mandatory guardrails now
+  bound PR scope.** Required defects remain merge-blocking regardless of a
+  model's severity label.
+- **Every review root cause receives one finite disposition:** fix now, block,
+  reject with a reason, or create one follow-up only when the finding is
+  reproducible, actionable, non-duplicate, worth scheduling, and outside the
+  PR's required scope. Severity alone never creates a bead.
+- **Review has a terminal state:** verified blocks stop immediately; otherwise
+  review ends after at most three rounds without creating recursive review
+  tasks. Canonical skills, generated skills, templates, and knowledge mirrors
+  now share this policy, with regression coverage against the retired behavior.
+
 ## [3.54.0] - 2026-08-07
 
 Deferred-debt release. Two generated projects (nibble, rumble) independently
