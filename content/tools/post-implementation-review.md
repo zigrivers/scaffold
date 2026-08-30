@@ -569,7 +569,7 @@ Create `docs/reviews/` if it does not exist. Write the following to
 _Populated during fix execution._
 
 ## Remaining Findings
-_Populated when the same finding remains unresolved after 3 fix attempts._
+_Populated only for an evidence-backed external stop condition._
 ```
 
 **If Report Only mode:** After writing the report, stop. Tell the user:
@@ -609,10 +609,15 @@ For each finding:
    - If no tests exist for this file, re-read the file to confirm the fix is correct
 4. If verification passes: mark the finding as resolved.
 5. If verification fails: attempt to fix the failure. This counts as the same round.
-6. Track fix attempts per finding. After 3 failed attempts:
-   - Record the finding under "Remaining Findings" in the report
-   - Stop attempting to fix it
-   - Continue to the next finding in the queue
+6. Track attempts within a bounded three-round cycle. After three failed
+   attempts, do not repeat the same approach. Reproduce and reclassify the root
+   cause. If it is within the acceptance criteria or a required safeguard, make
+   a different concrete repair, add focused regression proof, run the required
+   gate, and re-review the new exact head in a new bounded cycle. Record it under
+   "Remaining Findings" only for an external dependency, missing credentials or
+   authority, a destructive action, an out-of-scope material product decision,
+   or a demonstrated technical plateau after safe approaches are exhausted. An
+   unresolved required-safeguard defect is not a plateau.
 
 After all findings in a severity tier are fixed, re-read each modified file
 once to confirm correctness before moving to the next tier.
@@ -697,8 +702,8 @@ Fixed: [N] | Remaining: [N]
 Report: docs/reviews/post-implementation-review.md
 ```
 
-If any findings remain in "Remaining Findings", list them explicitly and tell
-the user they require manual attention before the project is ready to release.
+If any findings remain in "Remaining Findings", list each stopping condition
+and its exact evidence. The project is not ready to release.
 
 ## Fallback Behavior
 
@@ -723,7 +728,13 @@ the user they require manual attention before the project is ready to release.
 3. **Auth failures are not silent** — always surface to the user with the exact recovery command (`! codex login` or `! agy -p "hello"`). Wait for user response before queuing a compensating pass.
 4. **Independence** — never share one channel's output with another. Each reviews independently.
 5. **Verify every fix** — run tests (or re-read the file) immediately after each fix before moving on.
-6. **3-round limit (per finding identity)** — never attempt to fix the *same* blocking finding more than 3 times. Mirror the wrapper hash identity used by `review-pr.md` and `review-code.md`: `location` + `category` + `description` + `suggestion`. This tool's JSON prompt templates already require `category`; it does not have wrapper-side Step 7a attempts-file bookkeeping, so track attempts in the review report/session notes. Each round that surfaces genuinely different findings with new identities is healthy iteration — keep going. Stop when an identity hits 3 attempts, when the same underlying defect recurs across 3 rounds even if reviewer wording changes, when channels contradict each other, or when the user asks to stop. Surface unresolved findings to the user.
+6. **Bounded remediation cycles** — use a maximum of three rounds per review
+   cycle. Duplicate, stale, hypothetical, speculative, cosmetic, or
+   already-dispositioned findings cannot start a new cycle. A reproducible
+   in-scope or required-safeguard blocker may start one only after a concrete
+   repair, focused regression proof, and the required gate; review the new exact
+   head from round one. No owner approval is required for in-scope remediation.
+   Stop only for the evidence-backed external conditions in Step 8.
 7. **Document everything** — the report must show which channels ran, which were compensating, which were skipped, and the root cause for any degraded channel.
 8. **No auto-merge** — this tool modifies local files only. It never pushes, merges, or creates PRs.
 9. **Dispatch pattern cross-reference** — Phase 2 parallel dispatch uses `superpowers:dispatching-parallel-agents`. Each story subagent dispatches its own `superpowers:code-reviewer` as Channel 3. This two-level nesting is intentional and supported.

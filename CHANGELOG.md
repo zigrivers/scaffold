@@ -4,6 +4,16 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- **In-scope review remediation is now autonomous.** MMR remains capped at
+  three rounds per cycle, but a reproducible round-three acceptance-criteria or
+  required-safeguard blocker can start a fresh bounded cycle on the same PR
+  after a concrete repair, focused regression proof, and the required gate.
+  Duplicate, stale, speculative, cosmetic, and already-dispositioned findings
+  cannot restart review, and merge still requires a reviewed exact head with no
+  verified blocker.
+
 ## [3.54.1] - 2026-08-30
 
 Bounded review-follow-up release. Multi-model review remains mandatory, but

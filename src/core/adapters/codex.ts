@@ -41,10 +41,7 @@ const PHASE_ORDER = [
 //
 // Source-of-truth meta-prompts: `content/tools/review-code.md` and
 // `content/tools/review-pr.md`. Keep the resolution chain and command
-// shape here in sync with those files. Note: those prompts add
-// `--session/--round/--max-rounds` for the Claude Code fix LOOP; Codex runs a
-// recipe once (single shot, no loop), so round-bounding adds nothing here and
-// is deliberately omitted.
+// shape here in sync with those files, including native per-cycle round bounds.
 const CODEX_EXECUTOR_RECIPES: Record<string, string> = {
   'review-code': `Run multi-model review on local code before commit or push
 (4 MMR CLI channels: Codex, Claude, Grok, Antigravity). Pick **one** of the three modes
@@ -66,34 +63,52 @@ elif git rev-parse --verify HEAD~1        >/dev/null 2>&1; then BASE_REF=HEAD~1
 else                                                            BASE_REF=HEAD
 fi
 MERGE_BASE=$(git merge-base "$BASE_REF" HEAD 2>/dev/null || echo "$BASE_REF")
+BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+[ "$BRANCH" = "HEAD" ] && BRANCH="detached-$(git rev-parse --short HEAD 2>/dev/null)"
+SESSION_ID="local-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
+CYCLE="\${CYCLE:-1}"
+ROUND="\${ROUND:-1}"
+MMR_FLAGS=(--session "$SESSION_ID-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json)
 
 # --quiet exits 0 when there's no diff. Streams the diff directly into mmr
 # rather than buffering through a shell variable (large diffs can OOM).
 if git diff --quiet "$MERGE_BASE"; then
   echo "No changes to review"; exit 0
 fi
-git diff "$MERGE_BASE" | mmr review --diff - --sync --format json
+git diff "$MERGE_BASE" | mmr review --diff - "\${MMR_FLAGS[@]}"
 \`\`\`
 
 **Mode 2 — staged changes only** (e.g. pre-commit gate):
 
 \`\`\`bash
-mmr review --staged --sync --format json
+BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+SESSION_ID="local-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
+CYCLE="\${CYCLE:-1}"
+ROUND="\${ROUND:-1}"
+mmr review --staged --session "$SESSION_ID-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json
 \`\`\`
 
 **Mode 3 — explicit branch diff** (substitute the actual branch name for
 \`BRANCH_NAME\`):
 
 \`\`\`bash
-mmr review --base main --head BRANCH_NAME --sync --format json
+SESSION_ID="local-$(printf '%s' BRANCH_NAME | tr -c 'a-zA-Z0-9_-' '-')"
+CYCLE="\${CYCLE:-1}"
+ROUND="\${ROUND:-1}"
+mmr review --base main --head BRANCH_NAME --session "$SESSION_ID-cycle-$CYCLE" \
+  --round "$ROUND" --max-rounds 3 --sync --format json
 \`\`\`
 
 Append \`--fix-threshold P0|P1|P2|P3\` to any of the above to override the
 project's configured threshold for this invocation.
 
-Verdicts: proceed only on \`pass\` or \`degraded-pass\`. On \`blocked\` or
-\`needs-user-decision\`, stop and surface to the user. Fix all findings at or above
-\`results.fix_threshold\` before proceeding.
+Use at most three rounds per cycle. After each verified repair, increment
+\`ROUND\` and review the new exact head. If round three leaves a reproducible
+in-scope or required-safeguard defect, make a concrete repair, add focused
+regression proof, pass the required gate, increment \`CYCLE\`, reset \`ROUND\`
+to 1, and review again. Duplicate, stale, hypothetical, speculative, cosmetic,
+or already-dispositioned findings cannot start a new cycle. Never advance on a
+\`blocked\` or \`needs-user-decision\` result.
 
 **4th channel:** the Superpowers \`code-reviewer\` reconcile pass requires a
 harness that can dispatch agent skills. Codex cannot do this directly — for
@@ -109,15 +124,21 @@ PR_NUMBER="\${PR_NUMBER:-$(gh pr view --json number -q .number 2>/dev/null)}"
 if [ -z "$PR_NUMBER" ]; then
   echo "PR_NUMBER not set and no PR for current branch"; exit 1
 fi
-mmr review --pr "$PR_NUMBER" --sync --format json
+CYCLE="\${CYCLE:-1}"
+ROUND="\${ROUND:-1}"
+mmr review --pr "$PR_NUMBER" --session "pr-$PR_NUMBER-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json
 \`\`\`
 
 Append \`--fix-threshold P0|P1|P2|P3\` to override the project's configured
 threshold for this invocation.
 
-Verdicts: proceed only on \`pass\` or \`degraded-pass\`. On \`blocked\` or
-\`needs-user-decision\`, stop and surface to the user. Fix all findings at or above
-\`results.fix_threshold\` before proceeding.
+Use at most three rounds per cycle. After each verified repair, increment
+\`ROUND\` and review the new exact head. If round three leaves a reproducible
+in-scope or required-safeguard defect, make a concrete repair, add focused
+regression proof, pass the required gate, increment \`CYCLE\`, reset \`ROUND\`
+to 1, and review the same PR again. Duplicate, stale, hypothetical, speculative,
+cosmetic, or already-dispositioned findings cannot start a new cycle. Never
+advance on a \`blocked\` or \`needs-user-decision\` result.
 
 **4th channel:** the Superpowers \`code-reviewer\` reconcile pass requires a
 harness that can dispatch agent skills. Codex cannot do this directly — for

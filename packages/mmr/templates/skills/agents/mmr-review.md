@@ -43,6 +43,21 @@ The verdict also reflects **how many channels reported**: fewer than
 `needs-user-decision` even with zero findings — one reviewer is not multi-model
 review. Treat that as "fix the channels" (`mmr doctor`), not as a pass.
 
+## Bounded remediation cycles
+
+Use a maximum of three rounds per review cycle. If round three confirms a
+reproducible defect within the original acceptance criteria or a required
+safeguard, make a concrete repair, add focused regression proof, pass the
+required gate, then start a new bounded cycle on the same PR. Reset to round one
+and review the new exact head under a new session id.
+
+Duplicate, stale, hypothetical, speculative, cosmetic, or already-dispositioned
+findings cannot start a new cycle. Continue without owner approval until every
+finding has a finite disposition and no verified blocker remains. Stop only for
+an external dependency, missing credentials or authority, a destructive action,
+an out-of-scope material product decision, or a demonstrated technical plateau.
+An unresolved required safeguard is not a plateau.
+
 ## Async flow (without `--sync`)
 
 `mmr review …` prints a job id → `mmr status <job-id>` until complete →

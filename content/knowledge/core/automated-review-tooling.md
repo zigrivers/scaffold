@@ -136,7 +136,7 @@ Apply the following evaluation order to determine the final verdict. The first m
 ```
 Verdict evaluation order:
 1. No channels completed? → needs-user-decision
-2. Any unresolved findings at or above `fix_threshold` after 3 fix rounds? → blocked
+2. Any unresolved findings at or above `fix_threshold` when round 3 ends? → blocked for this cycle
 3. Any channel not at full coverage? → degraded-pass
 4. All channels completed, no unresolved findings at or above `fix_threshold`? → pass
 ```
@@ -145,7 +145,16 @@ A channel is "not at full coverage" when: it ran as a compensating pass instead 
 
 **Verdict precedence reminder:** `needs-user-decision` > `blocked` > `degraded-pass` > `pass`. When multiple conditions apply simultaneously, the higher-precedence verdict wins.
 
-The verdict is always computed after all fix rounds are exhausted — do not emit a partial verdict mid-cycle. If a fix round resolves all findings at or above `fix_threshold`, the verdict upgrades from `blocked` to `pass` or `degraded-pass` depending on channel coverage. This upgrade must be verified explicitly by re-running the reconciliation step after each fix round, not assumed from the fact that fixes were applied.
+The verdict is always computed after all fix rounds in the current cycle are exhausted — do not emit a partial verdict mid-cycle. If a fix round resolves all findings at or above `fix_threshold`, the verdict upgrades from `blocked` to `pass` or `degraded-pass` depending on channel coverage. This upgrade must be verified explicitly by re-running the reconciliation step after each fix round, not assumed from the fact that fixes were applied. A cycle verdict gates the reviewed head; it is not a workflow stopping condition by itself.
+
+Each review cycle has at most three rounds. A reproducible round-three defect
+within the original acceptance criteria or a required safeguard may start a new
+bounded cycle only after a concrete repair, focused regression proof, and the
+required gate pass. The new cycle reviews the repaired exact head from round
+one under a new session id. Duplicate, stale, hypothetical, speculative,
+cosmetic, or already-dispositioned findings cannot restart a cycle. Model
+severity is evidence, not authority; the acting agent owns reproduction,
+deduplication, classification, and a finite disposition for every finding.
 
 ### Security-Focused Review Checklist
 

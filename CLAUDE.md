@@ -289,18 +289,18 @@ way.
   - Antigravity: `! agy -p "hello"`   (then open the printed Google OAuth URL)
 - **Independence** — never share one channel's output with another.
 - **Fix all blocking findings** (severity at or above `results.fix_threshold` in the verdict JSON; the project default lives in `.mmr.yaml` and is `P2` unless changed) before proceeding to the next task. Use `--fix-threshold P0|P1|P2|P3` on `scaffold run review-pr` / `review-code` to override per-invocation.
-- **Verdict handling** — proceed only on `pass` or `degraded-pass`. If the
-  review returns `blocked` or `needs-user-decision`, stop and surface the
-  verdict and remaining findings to the user. Do NOT merge automatically.
-- **3-round limit — native.** Round-bounding is enforced by MMR itself: the
-  `review-pr`/`review-code` meta-prompts pass `mmr review --session <id>
-  --max-rounds 3`. MMR tracks recurrence with its stable `finding_key`
-  (normalized `location` + `category` + `description` + `suggestion`, severity
-  excluded — `packages/mmr/src/core/stable-id.ts`) and stops re-attempting a
-  finding that survives the budget. Keep going while each round surfaces
-  *genuinely different* findings; stop when the same finding recurs past the
-  budget, when channels contradict each other (`needs-user-decision`), or when
-  the user asks to stop. (This replaces the former wrapper-side
+- **Verdict handling** — proceed only on `pass` or `degraded-pass`; never merge
+  on `blocked` or `needs-user-decision`. A verified in-scope blocker is repaired
+  under the bounded-cycle rule below. Stop only for the external conditions in
+  `docs/review-standards.md`.
+- **Three rounds per cycle — native.** The `review-pr`/`review-code`
+  meta-prompts pass `mmr review --session <target>-cycle-<C> --round <N>
+  --max-rounds 3`. If round three exposes a reproducible in-scope or
+  required-safeguard blocker, make a concrete repair, add focused regression
+  proof, rerun the gate, then review the new exact head from round one in a new
+  cycle on the same PR. No owner approval is required. Duplicate, stale,
+  hypothetical, speculative, cosmetic, or already-dispositioned findings do
+  not restart review. (This replaces the former wrapper-side
   `.scaffold/review-attempts/` hash bookkeeping, retired with the review-tool
   slim — see `docs/superpowers/specs/2026-07-11-review-pr-code-mmr-slim-design.md`.)
 - **Review policy lives in `docs/review-standards.md`** — the single home for

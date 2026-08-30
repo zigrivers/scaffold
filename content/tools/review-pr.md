@@ -44,7 +44,7 @@ local pre-commit review, or call `mmr review` directly with `--staged`,
 ## Expected Outputs
 
 - One reconciled MMR job covering the four CLI channels + the Superpowers agent channel
-- Findings at or above the fix threshold resolved (or surfaced when the round budget is exhausted)
+- Findings at or above the fix threshold resolved or stopped with exact external evidence
 - A review summary with per-channel results and a single verdict
 
 ## Instructions
@@ -68,17 +68,17 @@ If no PR is found, stop and tell the user to create a PR first.
 ### Step 2: Run MMR review (binding)
 
 One invocation. `--sync` is required for reconciliation, verdict, and exit
-codes. `--session pr-<N> --round <N> --max-rounds 3` enforces the 3-round budget
-**natively** (the native replacement for the old wrapper-side attempt
-bookkeeping). **`--round` is required for the cap to work:** MMR compares
-`--round` against `--max-rounds`, so without it every call looks like round 1 and
-the cap never fires. `ROUND` starts at 1 and increments each fix round (Step 4).
+codes. `--session pr-<N>-cycle-<C> --round <N> --max-rounds 3` enforces the
+three-round budget **per cycle**. **`--round` is required for the cap to work:**
+without it every call looks like round 1. `CYCLE` and `ROUND` start at 1. A new
+cycle uses a new session id on the same PR (Step 4).
 
 ```bash
-# ROUND is carried by YOU (the agent) across the fix loop — it is not persistent
-# shell state. Start at 1; increment it on each re-review (Step 4).
+# CYCLE and ROUND are carried by YOU (the agent) across the fix loop — they are
+# not persistent shell state. Increment ROUND after a repair within a cycle.
+CYCLE="${CYCLE:-1}"
 ROUND="${ROUND:-1}"
-MMR_FLAGS=(--pr "$PR_NUMBER" --session "pr-$PR_NUMBER" --round "$ROUND" --max-rounds 3 --sync --format json)
+MMR_FLAGS=(--pr "$PR_NUMBER" --session "pr-$PR_NUMBER-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json)
 [ -n "$FIX_THRESHOLD" ] && MMR_FLAGS+=(--fix-threshold "$FIX_THRESHOLD")
 # mmr exits 0 pass/degraded · 2 blocked · 3 needs-user-decision — the exit code
 # IS the verdict, so capture it without aborting (matters under `set -e`).
@@ -88,8 +88,8 @@ echo "$MMR_RESULT"
 JOB_ID=$(echo "$MMR_RESULT" | grep -o '"job_id": "[^"]*"' | head -1 | cut -d'"' -f4)
 ```
 
-When `--round` would exceed `--max-rounds` (round 4 with `--max-rounds 3`), MMR
-returns `needs-user-decision` — stop and surface the remaining findings.
+Never invoke round 4. At the third-round result, apply the bounded remediation
+rule in Step 4.
 
 Read `fix_threshold` and `reconciled_findings` from the JSON. Exit codes:
 `0` pass/degraded-pass · `2` blocked · `3` needs-user-decision. Cross-check each
@@ -131,22 +131,34 @@ only — note this in the summary rather than skipping silently.
 
 ### Step 4: Fix loop (project policy)
 
-Follow `docs/review-standards.md`. Default: fix every real finding at or above
-the fix threshold, push, **increment `ROUND`**, and re-run **Steps 2–3** (the
-full review, including the mandatory Superpowers reconcile — re-running Step 2
-alone would drop the fifth channel; keep the same `--session` and the
-incremented `--round` so MMR bounds the rounds). Stop on `pass`/`degraded-pass`,
-or on a stop condition — the round
-budget is exhausted (a finding survives 3 rounds), channels contradict each
-other, or the user asks to stop. Surface any channel auth failure with the
-recovery command MMR prints; never silent-skip.
+Follow `docs/review-standards.md`. Fix every verified in-scope defect, push,
+**increment `ROUND`**, and re-run **Steps 2–3** over the new exact head. Keep the
+same cycle session through round three.
+
+If round three leaves a reproducible defect within the original acceptance
+criteria or a required safeguard, start a new bounded cycle only after a
+concrete repair, focused regression proof, and the required gate pass. Increment
+`CYCLE`, reset `ROUND` to 1, and re-run Steps 2–3 on the same PR. Duplicate,
+stale, hypothetical, speculative, cosmetic, or already-dispositioned findings
+cannot start a new cycle. Do not run extra rounds to obtain a cosmetically clean
+response.
+
+Use evidence to reproduce, refute, deduplicate, classify, and disposition every
+finding; a model's severity label alone does not decide. Stop only for a true
+external dependency, missing credentials or authority, a destructive action, a
+material product decision outside the acceptance criteria, or a demonstrated
+technical plateau after safe approaches are exhausted. An unresolved required
+safeguard is not a plateau. Surface channel auth failures with the recovery
+command MMR prints.
 
 ### Step 5: Report
 
-Report the verdict, which channels completed vs. compensated, whether the
-Superpowers channel ran, and whether the PR is merge-ready. **Do not merge on
-`blocked` or `needs-user-decision`** — surface the unresolved findings to the
-user.
+Report the cycle and round, exact reviewed head, which channels completed or
+were compensated, whether the Superpowers channel ran, and every finding's
+finite disposition. The PR is merge-ready only when the final exact head meets
+the configured channel floor, required gates are green, every finding is
+dispositioned, and no verified blocker remains. Never merge on `blocked` or
+`needs-user-decision`.
 
 ## Manual fallback (MMR not installed)
 

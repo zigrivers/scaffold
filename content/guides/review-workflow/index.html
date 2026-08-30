@@ -1368,7 +1368,7 @@ nav.toc li.toc-3 a { padding-left: var(--sp-6); font-size: var(--text-xs); }
 <div class="layout">
   <aside class="rail" id="guide-toc">
     <button class="rail-close" data-action="nav" aria-label="Close navigation">✕</button>
-    <nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#what-this-guide-covers">What this guide covers</a></li><li class="toc-2"><a href="#step-1-pick-the-entry-point">Step 1 — Pick the entry point</a></li><li class="toc-3"><a href="#when-no-wrapper-fits">When no wrapper fits</a></li><li class="toc-2"><a href="#step-2-choose-the-input-mode">Step 2 — Choose the input mode</a></li><li class="toc-2"><a href="#step-3-read-the-verdict-then-act">Step 3 — Read the verdict, then act</a></li><li class="toc-2"><a href="#step-4-fix-the-blocking-findings-bounded">Step 4 — Fix the blocking findings (bounded)</a></li><li class="toc-3"><a href="#the-3-round-per-finding-limit">The 3-round-per-finding limit</a></li><li class="toc-3"><a href="#how-the-round-budget-is-enforced">How the round budget is enforced</a></li><li class="toc-2"><a href="#step-5-handle-degraded-mode">Step 5 — Handle degraded mode</a></li><li class="toc-2"><a href="#see-also">See also</a></li></ul></nav>
+    <nav class="toc" aria-label="Table of contents"><ul><li class="toc-2"><a href="#what-this-guide-covers">What this guide covers</a></li><li class="toc-2"><a href="#step-1-pick-the-entry-point">Step 1 — Pick the entry point</a></li><li class="toc-3"><a href="#when-no-wrapper-fits">When no wrapper fits</a></li><li class="toc-2"><a href="#step-2-choose-the-input-mode">Step 2 — Choose the input mode</a></li><li class="toc-2"><a href="#step-3-read-the-verdict-then-act">Step 3 — Read the verdict, then act</a></li><li class="toc-2"><a href="#step-4-fix-blocking-findings-in-bounded-cycles">Step 4 — Fix blocking findings in bounded cycles</a></li><li class="toc-3"><a href="#maximum-three-rounds-per-review-cycle">Maximum three rounds per review cycle</a></li><li class="toc-3"><a href="#how-the-round-budget-is-enforced">How the round budget is enforced</a></li><li class="toc-2"><a href="#step-5-handle-degraded-mode">Step 5 — Handle degraded mode</a></li><li class="toc-2"><a href="#see-also">See also</a></li></ul></nav>
   </aside>
   <main class="content"><h2 id="what-this-guide-covers">What this guide covers</h2>
 <p>This is the <strong>workflow</strong> around multi-model review: <em>when</em> to review, <em>which</em>
@@ -1494,8 +1494,9 @@ guess which untracked files you meant to include
 file, or <code>-</code> for stdin. It does not accept raw document text; wrap the target in
 a diff first.</p>
 <h2 id="step-3-read-the-verdict-then-act">Step 3 — Read the verdict, then act</h2>
-<p>Every review collapses to exactly one of four verdicts. The verdict, not the raw
-findings, is what decides whether you proceed. The
+<p>Every review collapses to exactly one of four verdicts. The verdict gates merge;
+the acting agent uses the evidence and original acceptance criteria to decide
+whether a new remediation cycle is warranted. The
 <a href="../mmr/index.md">MMR reference</a> defines the gate, the severity tiers, and the
 exact derivation algorithm; this table is the <em>action</em> you take for each outcome.</p>
 
@@ -1528,7 +1529,7 @@ exact derivation algorithm; this table is the <em>action</em> you take for each 
 
 
 
-<table><thead><tr><th>Verdict</th><th>Exit</th><th>Do</th></tr></thead><tbody><tr><td><code>pass</code></td><td>0</td><td><strong>Proceed</strong> — merge / push / next task.</td></tr><tr><td><code>degraded-pass</code></td><td>0</td><td><strong>Proceed</strong>, noting reduced coverage. The max achievable verdict once any channel was compensated.</td></tr><tr><td><code>blocked</code></td><td>2</td><td><strong>Stop.</strong> Fix the blocking findings (Step 4), then re-review. Do not merge.</td></tr><tr><td><code>needs-user-decision</code></td><td>3</td><td><strong>Stop and surface to the user.</strong> Automated iteration can't resolve this.</td></tr></tbody></table>
+<table><thead><tr><th>Verdict</th><th>Exit</th><th>Do</th></tr></thead><tbody><tr><td><code>pass</code></td><td>0</td><td><strong>Proceed</strong> — merge / push / next task.</td></tr><tr><td><code>degraded-pass</code></td><td>0</td><td><strong>Proceed</strong>, noting reduced coverage. The max achievable verdict once any channel was compensated.</td></tr><tr><td><code>blocked</code></td><td>2</td><td><strong>Do not merge.</strong> Fix the verified blocker, then re-review.</td></tr><tr><td><code>needs-user-decision</code></td><td>3</td><td><strong>Do not merge.</strong> Diagnose the cause; remediate in-scope defects or stop only for an external condition below.</td></tr></tbody></table>
 <p>A review is <code>blocked</code> when any unacknowledged finding sits at or above the fix
 threshold (<span class="sev sev-p2">P2</span> by default; override per-run with
 <code>--fix-threshold</code>). See the <a href="../mmr/index.md">MMR reference</a> for how the verdict
@@ -1541,37 +1542,39 @@ is not multi-model review. In practice you'll hit this when only one CLI is
 installed or authed: fix the channel (<code>mmr doctor</code>) rather than treating the
 empty result as a pass. <code>blocked</code> still outranks the floor, so a real blocking
 finding is always reported as <code>blocked</code>.</p></div>
-<div class="callout callout-warning"><p><strong>Proceed only on <code>pass</code> or <code>degraded-pass</code>.</strong> On <code>blocked</code> or
-<code>needs-user-decision</code>, never merge automatically — surface the verdict and the
-remaining findings to the user. The wrappers enforce this: report only says the
-PR is merge-ready on <code>pass</code> / <code>degraded-pass</code>
-<span class="fp" data-path="content/tools/review-pr.md:147">content/tools/review-pr.md:147</span>.</p></div>
-<h2 id="step-4-fix-the-blocking-findings-bounded">Step 4 — Fix the blocking findings (bounded)</h2>
-<p>When the verdict is <code>blocked</code>, the loop is: fix the findings at or above the
-threshold → re-review → repeat. The guard rail is that this loop is <strong>bounded
-per finding</strong>, so a finding the model can't actually fix doesn't trap you in an
-infinite cycle.</p>
-<h3 id="the-3-round-per-finding-limit">The 3-round-per-finding limit</h3>
-<p>The limit is <strong>3 attempts per finding</strong>, not 3 rounds total. Each round that
-surfaces <em>genuinely new</em> findings is healthy iteration — keep going. The loop
-stops only when one specific finding has been attempted three times without
-resolution.</p>
-<p>A "finding" here is its <strong>stable identity</strong>, not its wording, so a re-worded
-report of the same defect still counts against the same finding. (The
-<a href="../mmr/index.md">MMR reference</a> covers how that identity is computed.) Co-equal
-stop conditions:</p>
-<ul>
-<li>A finding's identity reaches 3 recorded attempts.</li>
-<li>The same underlying defect recurs across 3 rounds even if the reviewer's
-wording produces a new identity each time.</li>
-<li>Channels genuinely contradict each other (→ <code>needs-user-decision</code>).</li>
-<li>The user explicitly asks to stop.</li>
-</ul>
-<p>When you stop, <strong>do not merge</strong>. Document each unresolved finding (severity,
-location, attempt count) and hand the decision to the user
-<span class="fp" data-path="content/tools/review-pr.md:147">content/tools/review-pr.md:147</span>.</p>
+<div class="callout callout-warning"><p><strong>Proceed only on <code>pass</code> or <code>degraded-pass</code>.</strong> Never merge on <code>blocked</code> or
+<code>needs-user-decision</code>. A final-round in-scope blocker starts the bounded repair
+process below; it does not require owner approval. The wrappers report a PR as
+merge-ready only on <code>pass</code> / <code>degraded-pass</code>
+<span class="fp" data-path="content/tools/review-pr.md:160">content/tools/review-pr.md:160</span>.</p></div>
+<h2 id="step-4-fix-blocking-findings-in-bounded-cycles">Step 4 — Fix blocking findings in bounded cycles</h2>
+<p>When the verdict is <code>blocked</code>, the loop is: verify each finding → repair the
+smallest root cause → add focused regression proof → run the required gate →
+review the new exact head. Every semantic finding receives one finite,
+evidence-backed disposition.</p>
+<h3 id="maximum-three-rounds-per-review-cycle">Maximum three rounds per review cycle</h3>
+<p>Each MMR session is one review cycle with at most three rounds. A cycle never
+dispatches round four. If round three finds a reproducible defect within the
+original acceptance criteria or a required safeguard, make a concrete repair,
+add focused regression proof, rerun the required gate, then start a new bounded
+cycle on the same PR. Reset the round to one and review the new exact head.</p>
+<p>Duplicate, stale, hypothetical, speculative, cosmetic, or already-dispositioned
+findings cannot start a new cycle. A model's severity label alone never controls
+the decision, and no extra round runs merely to obtain a cosmetically clean
+response.</p>
+<p>Continue until every root cause has a disposition and no verified fix-now or
+block item remains. No owner approval is required for in-scope remediation.
+Stop only for a true external dependency, missing credentials or authority, a
+destructive action, a material product decision outside the acceptance
+criteria, or a demonstrated technical plateau after safe approaches are
+exhausted. Record exact evidence. An unresolved required safeguard is not a
+plateau; continue repairing it. Required safeguards include security, privacy,
+accessibility, data integrity, and project-specific product protections.</p>
+<p>Merge only when the final exact head has completed the configured MMR channel
+floor, required gates are green, every finding is dispositioned, and no
+verified blocker remains <span class="fp" data-path="content/tools/review-pr.md:158">content/tools/review-pr.md:158</span>.</p>
 <h3 id="how-the-round-budget-is-enforced">How the round budget is enforced</h3>
-<p>Round-bounding is <strong>native</strong> to the engine. The wrappers pass <code>mmr review --session &#x3C;id> --round &#x3C;N> --max-rounds 3</code>
+<p>Round-bounding is <strong>native</strong> to the engine. The wrappers pass <code>mmr review --session &#x3C;target>-cycle-&#x3C;C> --round &#x3C;N> --max-rounds 3</code>
 <span class="fp" data-path="content/tools/review-pr.md:81">content/tools/review-pr.md:81</span>, incrementing <code>--round</code> each fix round
 (<code>--round</code> is required — MMR compares it against <code>--max-rounds</code>, so without it
 every call is round 1 and the cap never fires). MMR enforces the budget using a
@@ -1580,8 +1583,9 @@ stable, line-number-independent <code>finding_key</code>
 severity changes and line-number shifts (a materially reworded description does
 change the key, since description and suggestion are part of it). (See the
 <a href="../mmr/index.md">MMR reference</a> for how that key collapses the same issue at
-different severities.) A finding that survives the budget stops being
-re-attempted; you don't track strikes by hand.</p>
+different severities.) A finding that survives a cycle is not re-attempted in
+that session; after a concrete repair, the next bounded cycle uses a new session
+id. You do not track strikes by hand.</p>
 <p>This replaced the former wrapper-side attempts file
 (<code>.scaffold/review-attempts/&#x3C;session-id>.json</code>), retired when the review tools
 were slimmed to the MMR-dispatch core.</p>

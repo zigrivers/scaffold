@@ -94,7 +94,9 @@ ROOT="$BATS_TEST_DIRNAME/.."
     "$ROOT/content/pipeline/environment/git-workflow.md"; do
     if grep -q "files beads for P2/P3" "$F" || \
       grep -q "file a bead per unresolved finding" "$F" || \
-      grep -q "degraded-pass" "$F"; then
+      grep -q "degraded-pass" "$F" || \
+      grep -q "A verified block ends review immediately" "$F" || \
+      grep -q "Review always ends after round 3" "$F"; then
       echo "retired review policy found in $F"
       return 1
     fi
@@ -104,7 +106,8 @@ ROOT="$BATS_TEST_DIRNAME/.."
   grep -q "severity label never creates a bead" "$F"
   grep -q "reproducible, actionable, non-duplicate, worth scheduling" "$F"
   grep -q "exactly one finite disposition" "$F"
-  grep -q "not the working agent acting alone" "$F"
+  ! grep -q "not the working agent acting alone" "$F"
+  grep -q "acting agent may" "$F"
 }
 
 @test "agent templates inherit the finite review disposition policy" {
@@ -116,8 +119,9 @@ ROOT="$BATS_TEST_DIRNAME/.."
   done
 }
 
-@test "review policy surfaces share safeguards and terminal behavior" {
+@test "round-three blocker starts a new bounded cycle after a concrete repair" {
   for F in \
+    "$ROOT/docs/review-standards.md" \
     "$ROOT/content/agent-skills/work-beads/SKILL.md" \
     "$ROOT/content/skills/work-beads/SKILL.md" \
     "$ROOT/content/pipeline/environment/automated-pr-review.md" \
@@ -126,14 +130,52 @@ ROOT="$BATS_TEST_DIRNAME/.."
     for REQUIRED in \
       "every root cause has a disposition and no verified fix-now or block item remains" \
       "security, privacy, and data integrity" \
-      "A verified block ends review immediately" \
-      "keep the PR open" \
-      "end the batch without merging"; do
+      "maximum of three rounds per review cycle" \
+      "concrete repair" \
+      "focused regression" \
+      "new exact head"; do
       if [[ "$NORMALIZED" != *"$REQUIRED"* ]]; then
         echo "missing '$REQUIRED' in $F"
         return 1
       fi
     done
+  done
+}
+
+@test "duplicate and speculative findings cannot restart review" {
+  for F in \
+    "$ROOT/docs/review-standards.md" \
+    "$ROOT/content/tools/review-pr.md" \
+    "$ROOT/content/agent-skills/work-beads/SKILL.md" \
+    "$ROOT/content/skills/work-beads/SKILL.md"; do
+    NORMALIZED="$(tr '\n' ' ' < "$F" | sed -E 's/[[:space:]]+/ /g')"
+    [[ "$NORMALIZED" == *"Duplicate, stale, hypothetical, speculative, cosmetic, or already-dispositioned"* ]]
+    [[ "$NORMALIZED" == *"cannot start a new cycle"* ]]
+  done
+}
+
+@test "clean final exact head keeps every merge safeguard" {
+  for F in \
+    "$ROOT/docs/review-standards.md" \
+    "$ROOT/content/agent-skills/work-beads/SKILL.md" \
+    "$ROOT/content/skills/work-beads/SKILL.md"; do
+    NORMALIZED="$(tr '\n' ' ' < "$F" | sed -E 's/[[:space:]]+/ /g')"
+    for REQUIRED in \
+      "final exact head" \
+      "configured MMR channel floor" \
+      "required gates are green" \
+      "every finding is dispositioned" \
+      "no verified blocker remains"; do
+      [[ "$NORMALIZED" == *"$REQUIRED"* ]]
+    done
+  done
+}
+
+@test "review-origin work cannot recursively create follow-up beads" {
+  for F in \
+    "$ROOT/content/agent-skills/work-beads/SKILL.md" \
+    "$ROOT/content/skills/work-beads/SKILL.md"; do
+    grep -q 'Review-origin work must not create recursive follow-up beads' "$F"
   done
 }
 
@@ -152,10 +194,21 @@ ROOT="$BATS_TEST_DIRNAME/.."
   done
 }
 
-@test "git workflow keeps verified blocks distinct from the round cap" {
+@test "git workflow distinguishes bounded cycles from genuine stop conditions" {
   F="$ROOT/content/pipeline/environment/git-workflow.md"
-  grep -q "immediate keep-open path for a verified block" "$F"
-  grep -q "cap path for a verified fix-now item" "$F"
+  grep -q "three rounds per review cycle" "$F"
+  grep -q "demonstrated technical plateau" "$F"
+  grep -q "required-safeguard defect is not a plateau" "$F"
+  grep -q "No owner approval is required" "$F"
+}
+
+@test "Scaffold PR template records review evidence without requiring a Bead" {
+  F="$ROOT/.github/pull_request_template.md"
+  ! grep -q '^## Beads Task' "$F"
+  grep -q 'No Scaffold Bead' "$F"
+  grep -q 'exact head' "$F"
+  grep -q 'Disposition ledger' "$F"
+  grep -q 'make check-all' "$F"
 }
 
 # NOTE: work-beads skill drift (canonical content/agent-skills → generated

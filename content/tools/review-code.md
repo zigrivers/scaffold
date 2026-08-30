@@ -74,12 +74,11 @@ fi
 ### Step 2: Run MMR review (binding), matched to scope
 
 `--sync` is required for reconciliation, verdict, and exit codes.
-`--session <id> --round <N> --max-rounds 3` enforces the 3-round budget
-**natively**. **`--round` is required for the cap to work** — MMR compares it
-against `--max-rounds`, so without it every call looks like round 1 and the cap
-never fires; `ROUND` starts at 1 and increments each fix round (Step 4). The
-session id must match `^[a-zA-Z0-9_-]+$`, so sanitize the branch name (strip
-`/`, `.`, and anything else — not just `/`).
+`--session <id>-cycle-<C> --round <N> --max-rounds 3` enforces the three-round
+budget per cycle. **`--round` is required for the cap to work** — without it
+every call looks like round 1. `CYCLE` and `ROUND` start at 1. The session id
+must match `^[a-zA-Z0-9_-]+$`, so sanitize the branch name (strip `/`, `.`, and
+anything else — not just `/`).
 
 ```bash
 # Session id must match ^[a-zA-Z0-9_-]+$, so sanitize the branch name (strip `/`,
@@ -88,10 +87,11 @@ session id must match `^[a-zA-Z0-9_-]+$`, so sanitize the branch name (strip
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 [ "$BRANCH" = "HEAD" ] && BRANCH="detached-$(git rev-parse --short HEAD 2>/dev/null)"
 SESSION_ID="local-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
-# ROUND is carried by YOU (the agent) across the fix loop (Step 4), not
-# persistent shell state. Start at 1; increment on each re-review.
+# CYCLE and ROUND are carried by YOU (the agent) across the fix loop (Step 4),
+# not persistent shell state. Increment ROUND after a repair within a cycle.
+CYCLE="${CYCLE:-1}"
 ROUND="${ROUND:-1}"
-MMR_FLAGS=(--session "$SESSION_ID" --round "$ROUND" --max-rounds 3 --sync --format json)
+MMR_FLAGS=(--session "$SESSION_ID-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json)
 [ -n "$FIX_THRESHOLD" ] && MMR_FLAGS+=(--fix-threshold "$FIX_THRESHOLD")
 ```
 
@@ -139,7 +139,8 @@ echo "$MMR_RESULT"   # surface the review JSON
 JOB_ID=$(echo "$MMR_RESULT" | grep -o '"job_id": "[^"]*"' | head -1 | cut -d'"' -f4)
 ```
 
-When `--round` would exceed `--max-rounds`, MMR returns `needs-user-decision`.
+Never invoke round 4. At the third-round result, apply the bounded remediation
+rule in Step 4.
 If the chosen scope's diff is empty, stop and tell the user there is nothing to
 review. Do NOT fall back to bare `mmr review` for the no-flags case — it would
 miss committed and staged work. If `mmr` is not installed, see **Manual
@@ -175,20 +176,30 @@ code-reviewer run the four CLI channels only — note it, don't skip silently.
 
 If `--report-only`: output the summary and verdict, apply no fixes, stop.
 
-Otherwise follow `docs/review-standards.md`: fix every real finding at or above
-the fix threshold, **increment `ROUND`**, then re-run **Steps 2–3** (the full
-review, including the mandatory Superpowers reconcile — re-running Step 2 alone
-would drop the fifth channel; keep the same `--session` and the incremented
-`--round` so MMR bounds the rounds). Stop on `pass`/`degraded-pass`, or on a stop
-condition — round budget
-exhausted, channels contradict each other, or the user asks to stop.
+Otherwise follow `docs/review-standards.md`: fix every verified in-scope defect,
+**increment `ROUND`**, then re-run **Steps 2–3** over the new exact head. Keep
+the same cycle session through round three.
+
+If round three leaves a reproducible defect within the original acceptance
+criteria or a required safeguard, start a new bounded cycle only after a
+concrete repair, focused regression proof, and the required gate pass. Increment
+`CYCLE`, reset `ROUND` to 1, and review the new exact head.
+Duplicate, stale, hypothetical, speculative, cosmetic, or already-dispositioned
+findings cannot start a new cycle. Do not dispatch extra rounds for a
+cosmetically clean model response.
+
+Stop only for a true external dependency, missing credentials or authority, a
+destructive action, a material product decision outside the acceptance
+criteria, or a demonstrated technical plateau after safe approaches are
+exhausted. An unresolved required safeguard is not a plateau.
 
 ### Step 5: Report
 
-Output a summary: scope label, per-channel results (completed / compensated),
-whether the Superpowers channel ran, findings, and the verdict. If the verdict
-is `pass` or `degraded-pass`, say the code is ready for the next delivery step
-(commit, push, or PR). **Never** advance on `blocked` or `needs-user-decision`.
+Output a summary: scope label, cycle and round, exact reviewed head, per-channel
+results, whether the Superpowers channel ran, each finding's finite disposition,
+and the verdict. Advance only when the configured channel floor and required
+gates pass and no verified blocker remains. Never advance on `blocked` or
+`needs-user-decision`.
 
 ## Manual fallback (MMR not installed)
 

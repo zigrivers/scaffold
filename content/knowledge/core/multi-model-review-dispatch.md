@@ -218,7 +218,8 @@ When models actively disagree (one flags an issue, another says the same thing i
 
 1. **Read both arguments.** Each model explains its reasoning. One may have a factual error.
 2. **Check against source material.** Read the actual artifact and upstream docs. The correct answer is in the documents, not in model opinions.
-3. **Default to the stricter interpretation.** If genuinely ambiguous, the finding stands at reduced severity (P1 → P2).
+3. **Resolve from evidence, not labels.** Reproduce, refute, or identify the
+   missing evidence. A model's severity label alone never controls the decision.
 4. **Document the disagreement.** The reconciliation report should note: "Models disagreed on [topic]. Resolution: [decision and rationale]."
 
 ### Consensus Classification
@@ -226,8 +227,8 @@ When models actively disagree (one flags an issue, another says the same thing i
 When synthesizing multi-model findings, classify each finding:
 - **Consensus**: All participating models flagged the same issue at similar severity → report at the agreed severity
 - **Majority**: 2+ models agree, 1 dissents → report at the lower of the agreeing severities; note the dissent
-- **Divergent**: Models disagree on severity or one model found an issue others missed → present to user for decision, minimum P2 severity
-- **Unique**: Only one model raised the finding → include with attribution, flag as "single-model finding" for user review
+- **Divergent**: Models disagree on severity or one model found an issue others missed → acting agent verifies and records one evidence-backed disposition
+- **Unique**: Only one model raised the finding → include with attribution and verify it like any other finding
 
 ### Output Format
 

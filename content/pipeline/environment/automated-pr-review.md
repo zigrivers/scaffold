@@ -1,7 +1,7 @@
 ---
 name: automated-pr-review
 description: "Agent-driven automated code review via MMR — the generated project's mandatory entry point is direct `mmr review --pr <N> --sync --format json`, not a scaffold wrapper, for PR and non-PR targets"
-summary: "Configures agent-driven automated code review: mandatory after `gh pr create` and also usable on any non-PR target. The entry point is direct `mmr review --pr <N> --sync --format json` (Codex, Antigravity, Claude) with finite root-cause dispositions and a 3-round cap; `scaffold run review-pr` / `scaffold run review-code` add the Superpowers channel when scaffold is present. A GitHub App reviewer is a fallback when CLIs are unavailable."
+summary: "Configures agent-driven automated code review: mandatory after `gh pr create` and also usable on any non-PR target. The entry point is direct `mmr review --pr <N> --sync --format json` (Codex, Antigravity, Claude) with finite root-cause dispositions and at most three rounds per bounded remediation cycle; `scaffold run review-pr` / `scaffold run review-code` add the Superpowers channel when scaffold is present. A GitHub App reviewer is a fallback when CLIs are unavailable."
 phase: "environment"
 order: 340
 dependencies: [git-workflow]
@@ -26,12 +26,17 @@ product safeguard required by project instructions.
 Reconcile findings by root cause into `fix-now`, `block`, `reject:<reason>`,
 or `follow-up:<bead-id>`. Severity alone never creates backlog work. A
 follow-up must be reproducible, actionable, non-duplicate, worth scheduling,
-and outside the current PR's required scope. Review stops when every root cause
-has a disposition and no verified fix-now or block item remains; otherwise it
-ends after three rounds. A verified block ends review immediately. Keep the PR
-open, post the ledger and reproduction, notify the user, and end the batch
-without merging. At the cap, use the same keep-open exit for a verified fix-now
-item that remains.
+and outside the current PR's required scope. Review allows a maximum of three
+rounds per review cycle and stops when every root cause has a disposition and no
+verified fix-now or block item remains. If round three finds a reproducible
+in-scope or required-safeguard defect, make a concrete repair, add focused
+regression proof, rerun the required gate, and review the new exact head from
+round one in a new bounded cycle. Duplicate, stale, hypothetical, speculative,
+cosmetic, or already-dispositioned findings cannot restart review. No owner
+approval is required for in-scope remediation. Stop only for an external
+dependency, missing credentials or authority, a destructive action, an
+out-of-scope material product decision, or a demonstrated technical plateau.
+An unresolved required safeguard is not a plateau.
 Channel auth failures are always surfaced to the user with recovery
 commands — never silently skipped. When the target project has `scaffold`
 itself available, `scaffold run review-pr` and `scaffold run review-code`
@@ -79,8 +84,9 @@ review-fix loop locally.
 - (mvp) CLAUDE.md documents `mmr review --pr <N> --sync --format json` as the
   mandatory PR-review entry point, not a scaffold wrapper
 - (mvp) CLAUDE.md documents finite root-cause dispositions, the five follow-up
-  gates, a 3-round cap, and acceptance-criteria or mandatory-guardrail defects
-  as merge-blocking regardless of a model's severity label
+  gates, a maximum of three rounds per review cycle, autonomous bounded
+  remediation, and acceptance-criteria or mandatory-guardrail defects as
+  merge-blocking regardless of a model's severity label
 - (mvp) Channel auth failures are surfaced to the user with recovery
   commands, never silently skipped
 - (deep) Legacy GitHub Actions workflows detected and cleanup offered
@@ -202,7 +208,7 @@ overwrite or drop unrelated hooks):
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '.tool_input.command // empty' | grep -q 'gh pr create' && echo 'MANDATORY: run mmr review --pr <PR#> --sync --format json before moving on.\\nGroup duplicate findings by root cause and record one disposition: fix-now, block, reject:<reason>, or follow-up:<bead-id>. Severity alone never creates a bead. Follow-up work requires all five gates: reproducible, actionable, non-duplicate, worth scheduling, and outside scope.\\nMandatory guardrails include at minimum security, privacy, and data integrity, plus every repository or product safeguard required by project instructions.\\nHard cap 3 rounds: review stops when every root cause has a disposition and no verified fix-now or block item remains. A verified block ends review immediately: keep the PR open, post the ledger and reproduction, notify the user, and end the batch without merging. At the cap, use the same keep-open exit for a verified fix-now item that remains.\\nSurface channel auth failures with recovery commands (! codex login / ! agy -p \"hello\" / ! claude login) — never silently skip a channel.\\nSee docs/review-standards.md.' || true"
+            "command": "jq -r '.tool_input.command // empty' | grep -q 'gh pr create' && echo 'MANDATORY: run mmr review --pr <PR#> --sync --format json before moving on.\\nGroup duplicate findings by root cause and record one disposition: fix-now, block, reject:<reason>, or follow-up:<bead-id>. Severity alone never creates a bead. Follow-up work requires all five gates: reproducible, actionable, non-duplicate, worth scheduling, and outside scope.\\nMandatory guardrails include at minimum security, privacy, and data integrity, plus every repository or product safeguard required by project instructions.\\nMaximum of three rounds per review cycle. A round-three reproducible in-scope or required-safeguard blocker may start a new bounded cycle only after a concrete repair, focused regression proof, and the required gate pass; review the new exact head from round one. Duplicate, stale, hypothetical, speculative, cosmetic, or already-dispositioned findings cannot restart review. Continue until every root cause has a disposition and no verified fix-now or block item remains.\\nSurface channel auth failures with recovery commands (! codex login / ! agy -p \"hello\" / ! claude login) — never silently skip a channel.\\nSee docs/review-standards.md.' || true"
           }
         ]
       }
@@ -244,13 +250,23 @@ never creates a bead. Follow-up work requires all five gates: reproducible,
 actionable, non-duplicate, worth scheduling, and outside scope. Mandatory
 guardrails include at minimum security, privacy, and data integrity (including
 preventing data loss or corruption), plus every repository or product safeguard
-required by project instructions. Hard cap 3 rounds: review stops when every
-root cause has a disposition and no verified fix-now or block item remains. A
-verified block ends review immediately. Keep the PR open, post the ledger and
-reproduction, notify the user, and end the batch without merging. At the cap,
-use the same keep-open exit for a verified fix-now item that remains. Surface
-channel auth failures to the user with recovery commands; never silently skip a
-channel. A post-hook on `gh pr create` will remind you.
+required by project instructions. Use a maximum of three rounds per review
+cycle. If round three finds a reproducible in-scope or required-safeguard
+defect, make a concrete repair, add focused regression proof, rerun the required
+gate, and review the new exact head from round one in a new bounded cycle.
+Duplicate, stale, hypothetical, speculative, cosmetic, or already-dispositioned
+findings cannot restart review. Continue until every root cause has a
+disposition and no verified fix-now or block item remains. No owner approval is
+required for in-scope remediation. Stop only for a true external dependency,
+missing credentials or authority, a destructive action, a material product
+decision outside the acceptance criteria, or a demonstrated technical plateau
+after safe approaches are exhausted. An unresolved required safeguard is not a
+plateau. Surface channel auth failures to the user with recovery commands;
+never silently skip a channel. A post-hook on `gh pr create` will remind you.
+
+Merge only when the final exact head has completed the configured MMR channel
+floor, required gates are green, every finding is dispositioned, and no
+verified blocker remains.
 
 **Optional but supported** for non-PR targets — the review is not PR-gated.
 `mmr review` runs the three CLI channels (Codex, Antigravity, Claude) on any

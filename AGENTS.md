@@ -13,6 +13,20 @@ git pull --rebase     # Rebase onto latest remote state
 git push              # Publish local commits
 ```
 
+## Autonomous Review Cycles
+
+`docs/review-standards.md` is the source of truth. Keep each MMR review cycle
+to at most three rounds. A round-three reproducible in-scope or
+required-safeguard blocker may start a new bounded cycle on the same PR only
+after a concrete repair, focused regression proof, and the required gate pass.
+Review the repaired exact head from round one. No owner approval is required
+for this in-scope remediation.
+
+Do not restart for duplicate, stale, hypothetical, speculative, cosmetic, or
+already-dispositioned findings. Merge only after the final exact head meets the
+configured channel floor, required gates are green, every finding is
+dispositioned, and no verified blocker remains.
+
 ## Scaffold Releases
 
 When releasing Scaffold itself, follow `docs/architecture/operations-runbook.md`

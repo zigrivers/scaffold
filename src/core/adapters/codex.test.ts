@@ -172,6 +172,10 @@ describe('CodexAdapter', () => {
       // Direct mmr review invocations are present
       expect(content).toContain('mmr review --staged')
       expect(content).toContain('mmr review --diff -')
+      expect(content).toContain('CYCLE="${CYCLE:-1}"')
+      expect(content).toContain('--session "$SESSION_ID-cycle-$CYCLE"')
+      expect(content).toContain('--round "$ROUND" --max-rounds 3')
+      expect(content).toMatch(/new exact head/i)
 
       // BASE_REF resolution mirrors content/tools/review-code.md (7-level ladder)
       expect(content).toContain('git symbolic-ref refs/remotes/origin/HEAD')
@@ -212,6 +216,14 @@ describe('CodexAdapter', () => {
 
       // PR_NUMBER detection is shown so agents don't run with an empty value
       expect(content).toContain('gh pr view --json number')
+
+      // Each remediation cycle keeps MMR's native three-round cap while a
+      // verified in-scope repair can restart at round one on the same PR.
+      expect(content).toContain('CYCLE="${CYCLE:-1}"')
+      expect(content).toContain('--session "pr-$PR_NUMBER-cycle-$CYCLE"')
+      expect(content).toContain('--round "$ROUND" --max-rounds 3')
+      expect(content).toMatch(/concrete repair.*focused\s+regression.*required\s+gate/is)
+      expect(content).toMatch(/Duplicate, stale, hypothetical, speculative,\s+cosmetic, or already-dispositioned/)
 
       // No reconcile claim
       expect(content).not.toContain('mmr reconcile')

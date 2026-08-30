@@ -189,10 +189,12 @@ order:
       commands — a plain invocation installs nothing); draft PR on the first
       push — the draft is the visible claim.
    5. Verify: `make check` green on branch HEAD, personally watched.
-   6. Review + enqueue: `mmr review --pr <N> --sync --format json` (3-round
-      cap; a verified block ends review immediately and keeps the PR open), then
-      `make mq-enqueue PR=<N>` only when no verified fix-now or block item
-      remains — the queue lands or ejects; NEVER `gh pr merge` directly
+   6. Review + enqueue: `mmr review --pr <N> --sync --format json` (at most
+      three rounds per bounded cycle; after a concrete repair and focused
+      regression proof, a round-three in-scope blocker restarts at round one on
+      the same PR), then `make mq-enqueue PR=<N>` only when the final exact head
+      meets the channel floor and no verified fix-now or block item remains —
+      the queue lands or ejects; NEVER `gh pr merge` directly
       (mq-guard blocks it). Fallback without the queue: merge-slot-serialized
       `gh pr merge --squash --delete-branch`; `make main-sync && make
       prune-merged`.
@@ -208,10 +210,11 @@ order:
    5.5 = `mmr review`) — step 6 above is that workflow's later steps
    condensed, not a competing enumeration.
 
-2. **Standing authorization** — verbatim: "Run this whole loop without
-   asking permission; do not end your turn after opening a draft PR." Name
-   the one exception: a verified, still-reproducing P0, or a blocker you can
-   name.
+2. **Standing authorization** — verbatim: "Run this whole loop without asking
+   permission; do not end your turn after opening a draft PR." An in-scope
+   blocker is repaired autonomously. Stop only for a true external dependency,
+   missing credentials or authority, a destructive action, an out-of-scope
+   material product decision, or a demonstrated technical plateau.
 
 3. **Parallel-safety hard rules** — the primary checkout is shared and
    read-only (agents work in worktrees, never commit there); one agent per
