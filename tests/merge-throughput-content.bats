@@ -86,6 +86,24 @@ ROOT="$BATS_TEST_DIRNAME/.."
   grep -q 'check-affected' "$F"
 }
 
+@test "work-beads bounds review findings before creating follow-up beads" {
+  F="$ROOT/content/agent-skills/work-beads/SKILL.md"
+  grep -q "severity label never creates a bead" "$F"
+  grep -q "reproducible, actionable, non-duplicate, worth scheduling" "$F"
+  grep -q "exactly one finite disposition" "$F"
+  ! grep -q "files beads for P2/P3" "$F"
+  ! grep -q "file a bead per unresolved finding" "$F"
+}
+
+@test "agent templates inherit the finite review disposition policy" {
+  for F in \
+    "$ROOT/content/pipeline/environment/automated-pr-review.md" \
+    "$ROOT/content/pipeline/environment/git-workflow.md"; do
+    grep -q "Severity alone never creates" "$F"
+    grep -Eq "acceptance-criteria|acceptance criteria" "$F"
+  done
+}
+
 # NOTE: work-beads skill drift (canonical content/agent-skills → generated
 # content/skills) is gated by the `agent-skills-check` make target, which builds
 # the renderer (packages/agent-integration) BEFORE running the drift check.

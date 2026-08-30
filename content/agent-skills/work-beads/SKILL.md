@@ -347,7 +347,10 @@ hook; the cadence is the host's to bind.)*
 every stale doc in this same PR. Check the project-invariants section of
 AGENTS.md (if the project defines one) before shipping.
 
-**2.5 Defer = bead, immediately.** Anything you decide not to do now:
+**2.5 Deliberate scope deferral = bead.** File a bead when accepted scope is
+deliberately removed or a verified defect will not be fixed here. Review output
+uses the finite disposition process in 2.7. Suggestions, severity labels, and
+unsupported or low-value findings do not create beads:
 
 ```bash
 bd create "<imperative title>" -t task -p 2 --deps discovered-from:<id> \
@@ -374,13 +377,21 @@ fast on a saturated machine: `taskpolicy -c utility make check-affected`
   only your intended surface.
 - Surface channel auth failures to the user with recovery commands; never
   silently skip a channel.
-- Round budget: round 1 fixes every real finding; round 2+ fixes only P0/P1
-  and files beads for P2/P3. **Hard cap: 3 rounds — then complete the
-  degraded-pass merge yourself**: file a bead per unresolved finding, map them
-  in a PR comment, and merge. Do not stop for user sign-off at the cap.
-- The one thing that still blocks the merge: a verified, still-reproducing
-  real P0 — file it, keep the PR open, post the reproduction, notify the user,
-  end the batch.
+- The original bead, its acceptance criteria, and mandatory repository or
+  product guardrails bound the PR's required scope.
+- Group repeated findings by root cause. Record exactly one finite disposition:
+  `fix-now`, `block`, `reject:<reason>`, or `follow-up:<bead-id>`.
+- A model's severity label never creates a bead. Create one follow-up per root cause
+  only when the finding is reproducible, actionable, non-duplicate, worth scheduling,
+  and outside the PR's required scope.
+- Round 1 verifies root causes and fixes required defects. Rounds 2–3 review new
+  changes and collapse repeats into the existing dispositions.
+- Hard cap: 3 rounds. Stop when every root cause has a disposition and no
+  verified `fix-now` or `block` item remains. Do not rerun review merely to
+  clear suggestions, and do not create tasks from review-task review metadata.
+- A verified acceptance-criteria or mandatory-guardrail defect blocks merge
+  regardless of its model-assigned severity. A follow-up bead cannot make the
+  current PR safe.
 - **Merge queue installed** (`scripts/mq-guard.sh` exists — the
   merge-throughput step installs it): after the review passes, tear down
   staging first if you brought a stack up this bead (from INSIDE the worktree:
@@ -455,9 +466,10 @@ If the batch ran long and `launchpad` is installed: `launchpad notify "<summary>
 | Start bead k+1 before bead k's PR merges | One open PR per agent, strictly sequential |
 | Skip the draft PR "until it's ready" | The draft IS the claim other agents see |
 | End the turn after the draft PR with "next steps" | #1 observed agent failure — finish the loop |
-| Leave a TODO/FIXME comment | That work is a bead, filed now |
-| Merge with a red `make check` or Docker gate | Fix or file; never merge red |
-| Chase a clean review past round 3 | Degraded-pass self-merge is the documented path |
+| Leave deliberately deferred accepted scope as a TODO/FIXME comment | That work is a bead, filed now |
+| File a bead because a reviewer called something P2/P3 | Severity is not task authority; apply all five gates in 2.7 |
+| Merge with a red `make check` or a required defect | Fix or block; a future bead cannot make the current PR safe |
+| Chase a clean review past round 3 | Stop when the root-cause ledger is finite and no required defect remains |
 | Leave a staging stack you started running | `make staging-down` from the worktree before merging (only if you ran `staging-up`; never from the primary — it refuses there, and `prune-merged` reclaims it too) |
 | `--no-verify`, plain `--force`, merge commits | Forbidden; `--force-with-lease` after rebase only |
 | Close the bead when the PR opens | Close only after MERGED + verified |

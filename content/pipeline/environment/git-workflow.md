@@ -365,10 +365,12 @@ Depth-gate per Methodology Scaling above.
    `make check-affected`, not a full run here) -> (3) rebase -> (4) push ->
    (5) `gh pr create` (auto-applies `.github/pull_request_template.md`) ->
    **step 5.5: `mmr review --pr <N> --sync --format json`** (mandatory;
-   3-round cap — round 1 fixes every real finding, round 2+ fixes P0/P1
-   only and files beads for P2/P3, hard cap 3 rounds then
-   complete a degraded-pass self-merge; the one thing that still blocks
-   the merge is a verified, still-reproducing P0) -> (6) confirm the fast
+   group duplicate findings by root cause and give each one a finite
+   disposition. Severity alone never creates a bead. A follow-up must be
+   reproducible, actionable, non-duplicate, worth scheduling, and outside
+   scope; hard cap 3 rounds, then stop when every root cause is dispositioned
+   and no acceptance-criteria or mandatory-guardrail defect remains) ->
+   (6) confirm the fast
    gate green on the branch HEAD (`make check-affected`; run full `make
    check` instead when you touched gate config, shared test utils, or
    anything in the force-full list) -> (7) **enqueue, never merge
