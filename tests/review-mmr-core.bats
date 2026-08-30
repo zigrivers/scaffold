@@ -81,6 +81,8 @@ ROOT="$BATS_TEST_DIRNAME/.."
   grep -Eq -- '--session.*cycle.*--round.*--max-rounds 3' "$F"
   [[ "$NORMALIZED" == *"Duplicate, stale, hypothetical, speculative, cosmetic, or already-dispositioned"* ]]
   [[ "$NORMALIZED" == *"new exact head"* ]]
+  [[ "$NORMALIZED" == *"On resume"* ]]
+  [[ "$NORMALIZED" == *"MMR session history"* ]]
 }
 
 @test "review-code.md keeps the Superpowers reconcile channel" {
@@ -125,6 +127,9 @@ ROOT="$BATS_TEST_DIRNAME/.."
   [[ "$NORMALIZED" == *"blocked for this cycle"* ]]
   [[ "$NORMALIZED" == *"not a workflow stopping condition by itself"* ]]
   [[ "$NORMALIZED" == *"new cycle reviews the repaired exact head from round one"* ]]
+  [[ "$NORMALIZED" == *"proposes an untrusted project configuration or persistent acknowledgment change"* ]]
+  [[ "$NORMALIZED" == *"fewer than min_completed_channels"* ]]
+  [[ "$NORMALIZED" != *"contradictions that require human judgment"* ]]
 }
 
 @test "review policy preserves user stop and records evidence-backed refutations" {

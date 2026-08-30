@@ -79,6 +79,8 @@ budget per cycle. **`--round` is required for the cap to work** — without it
 every call looks like round 1. `CYCLE` and `ROUND` start at 1. The session id
 must match `^[a-zA-Z0-9_-]+$`, so sanitize the branch name (strip `/`, `.`, and
 anything else — not just `/`).
+On resume, recover the active cycle and round from MMR session history under the
+state root; use cycle one only when no prior review exists for the target.
 
 ```bash
 # Session id must match ^[a-zA-Z0-9_-]+$, so sanitize the branch name (strip `/`,
@@ -87,8 +89,8 @@ anything else — not just `/`).
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 [ "$BRANCH" = "HEAD" ] && BRANCH="detached-$(git rev-parse --short HEAD 2>/dev/null)"
 SESSION_ID="local-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
-# CYCLE and ROUND are carried by YOU (the agent) across the fix loop (Step 4),
-# not persistent shell state. Increment ROUND after a repair within a cycle.
+# On resume, recover CYCLE and ROUND from MMR session history under the state root.
+# They are agent-carried, not shell state; use cycle 1 only with no prior review.
 CYCLE="${CYCLE:-1}"
 ROUND="${ROUND:-1}"
 MMR_FLAGS=(--session "$SESSION_ID-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json)

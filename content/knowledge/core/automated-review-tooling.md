@@ -85,7 +85,7 @@ This constraint is intentionally duplicated from `multi-model-review-dispatch`. 
 
 After all channels complete (including compensating passes), reconcile findings using the rules in `multi-model-review-dispatch`. This orchestration entry triggers reconciliation; the dispatch entry defines how to perform it.
 
-Reconciliation normalizes findings from all channels (real and compensating) to a common schema, then matches findings across channels by location and category. The purpose is to detect when multiple independent channels agree on a finding (raising confidence) and to surface contradictions that require human judgment. A finding reported by Codex alone has lower confidence than the same finding reported by both Codex and Antigravity.
+Reconciliation normalizes findings from all channels (real and compensating) to a common schema, then matches findings across channels by location and category. The purpose is to detect when multiple independent channels agree on a finding (raising confidence) and to surface disagreements for an evidence-backed disposition. A finding reported by Codex alone has lower confidence than the same finding reported by both Codex and Antigravity.
 
 The reconciliation output is a deduplicated list of findings with confidence scores. High-confidence findings (agreed by 2+ real channels) are actionable without further discussion. Low-confidence findings (single-source, or from compensating passes) still require action when at or above `fix_threshold` but should be noted as lower-confidence in the review summary.
 
@@ -135,15 +135,19 @@ Apply the following evaluation order to determine the final verdict. The first m
 
 ```
 Verdict evaluation order:
+0. Before dispatch, round exceeds `max_rounds` or the reviewed diff proposes an untrusted project configuration or persistent acknowledgment change? → needs-user-decision
 1. No channels completed? → needs-user-decision
 2. Any unresolved findings at or above `fix_threshold` when round 3 ends? → blocked for this cycle
-3. Any channel not at full coverage? → degraded-pass
-4. All channels completed, no unresolved findings at or above `fix_threshold`? → pass
+3. Gate passed, but fewer than `min_completed_channels` reported? → needs-user-decision
+4. Any channel not at full coverage? → degraded-pass
+5. All channels completed, no unresolved findings at or above `fix_threshold`? → pass
 ```
 
 A channel is "not at full coverage" when: it ran as a compensating pass instead of a real tool, or it timed out.
 
-**Verdict precedence reminder:** `needs-user-decision` > `blocked` > `degraded-pass` > `pass`. When multiple conditions apply simultaneously, the higher-precedence verdict wins.
+**Verdict precedence reminder:** the pre-dispatch trust and round gates run first;
+after dispatch, `blocked` > `needs-user-decision` > `degraded-pass` > `pass`.
+This preserves a real blocker even when too few channels completed.
 
 The verdict is always computed after all fix rounds in the current cycle are exhausted — do not emit a partial verdict mid-cycle. If a fix round resolves all findings at or above `fix_threshold`, the verdict upgrades from `blocked` to `pass` or `degraded-pass` depending on channel coverage. This upgrade must be verified explicitly by re-running the reconciliation step after each fix round, not assumed from the fact that fixes were applied. A cycle verdict gates the reviewed head; it is not a workflow stopping condition by itself.
 
