@@ -95,8 +95,8 @@ AI review inserted as step 5.5):
 4. Push the branch
 5. Create the PR with a structured description
    - **Step 5.5 — mandatory AI review**: `mmr review --pr <N> --sync
-     --format json` (3-round cap; a degraded-pass self-merge past the cap
-     is the documented path, not a stall)
+     --format json` (finite root-cause dispositions; a verified block ends review
+     immediately; otherwise cap 3 rounds and keep the PR open if required work remains)
 6. Watch the local quality gates — pre-commit hooks ran, `make check-affected`
    (the fast merge gate) passes on the branch HEAD; the full `make check` runs
    post-merge and nightly — uncached — on the self-hosted runner or local
@@ -131,7 +131,8 @@ until a launch or deploy target is chosen:
 3. **Agent self-review** — re-read the diff against the project's coding
    standards before pushing
 4. **`mmr review --pr <N> --sync --format json`** — mandatory multi-model AI
-   review (3-round cap, degraded-pass self-merge past the cap)
+   review (finite root-cause dispositions, immediate keep-open exit on a
+   verified block, otherwise a 3-round cap)
 
 For a **base project**, `.github/workflows/` is deliberately absent until a
 launch/deploy target is picked — nothing runs these checks server-side yet, so

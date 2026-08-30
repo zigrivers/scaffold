@@ -86,6 +86,78 @@ ROOT="$BATS_TEST_DIRNAME/.."
   grep -q 'check-affected' "$F"
 }
 
+@test "work-beads bounds review findings before creating follow-up beads" {
+  for F in \
+    "$ROOT/content/agent-skills/work-beads/SKILL.md" \
+    "$ROOT/content/skills/work-beads/SKILL.md" \
+    "$ROOT/content/pipeline/environment/automated-pr-review.md" \
+    "$ROOT/content/pipeline/environment/git-workflow.md"; do
+    if grep -q "files beads for P2/P3" "$F" || \
+      grep -q "file a bead per unresolved finding" "$F" || \
+      grep -q "degraded-pass" "$F"; then
+      echo "retired review policy found in $F"
+      return 1
+    fi
+  done
+
+  F="$ROOT/content/agent-skills/work-beads/SKILL.md"
+  grep -q "severity label never creates a bead" "$F"
+  grep -q "reproducible, actionable, non-duplicate, worth scheduling" "$F"
+  grep -q "exactly one finite disposition" "$F"
+  grep -q "not the working agent acting alone" "$F"
+}
+
+@test "agent templates inherit the finite review disposition policy" {
+  for F in \
+    "$ROOT/content/pipeline/environment/automated-pr-review.md" \
+    "$ROOT/content/pipeline/environment/git-workflow.md"; do
+    grep -q "Severity alone never creates" "$F"
+    grep -Eq "acceptance-criteria|acceptance criteria" "$F"
+  done
+}
+
+@test "review policy surfaces share safeguards and terminal behavior" {
+  for F in \
+    "$ROOT/content/agent-skills/work-beads/SKILL.md" \
+    "$ROOT/content/skills/work-beads/SKILL.md" \
+    "$ROOT/content/pipeline/environment/automated-pr-review.md" \
+    "$ROOT/content/pipeline/environment/git-workflow.md"; do
+    NORMALIZED="$(tr '\n' ' ' < "$F" | sed -E 's/[[:space:]]+/ /g')"
+    for REQUIRED in \
+      "every root cause has a disposition and no verified fix-now or block item remains" \
+      "security, privacy, and data integrity" \
+      "A verified block ends review immediately" \
+      "keep the PR open" \
+      "end the batch without merging"; do
+      if [[ "$NORMALIZED" != *"$REQUIRED"* ]]; then
+        echo "missing '$REQUIRED' in $F"
+        return 1
+      fi
+    done
+  done
+}
+
+@test "living content drops the retired recursive review path" {
+  for RETIRED in \
+    "degraded-pass self-merge" \
+    "degraded-pass past the cap" \
+    "files beads for P2/P3" \
+    "file a bead per unresolved finding" \
+    "round 2+ fixes only P0/P1" \
+    "verified-P0 stop"; do
+    if grep -rqiF "$RETIRED" "$ROOT/content"; then
+      echo "retired review policy found: $RETIRED"
+      return 1
+    fi
+  done
+}
+
+@test "git workflow keeps verified blocks distinct from the round cap" {
+  F="$ROOT/content/pipeline/environment/git-workflow.md"
+  grep -q "immediate keep-open path for a verified block" "$F"
+  grep -q "cap path for a verified fix-now item" "$F"
+}
+
 # NOTE: work-beads skill drift (canonical content/agent-skills → generated
 # content/skills) is gated by the `agent-skills-check` make target, which builds
 # the renderer (packages/agent-integration) BEFORE running the drift check.
