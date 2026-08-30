@@ -104,6 +104,7 @@ ROOT="$BATS_TEST_DIRNAME/.."
   grep -q "severity label never creates a bead" "$F"
   grep -q "reproducible, actionable, non-duplicate, worth scheduling" "$F"
   grep -q "exactly one finite disposition" "$F"
+  grep -q "not the working agent acting alone" "$F"
 }
 
 @test "agent templates inherit the finite review disposition policy" {
@@ -137,9 +138,24 @@ ROOT="$BATS_TEST_DIRNAME/.."
 }
 
 @test "living content drops the retired recursive review path" {
-  ! rg -q -i \
-    'degraded-pass (self-merge|past the cap)|files beads for P2/P3|file a bead per unresolved finding' \
-    "$ROOT/content"
+  for RETIRED in \
+    "degraded-pass self-merge" \
+    "degraded-pass past the cap" \
+    "files beads for P2/P3" \
+    "file a bead per unresolved finding" \
+    "round 2+ fixes only P0/P1" \
+    "verified-P0 stop"; do
+    if grep -rqiF "$RETIRED" "$ROOT/content"; then
+      echo "retired review policy found: $RETIRED"
+      return 1
+    fi
+  done
+}
+
+@test "git workflow keeps verified blocks distinct from the round cap" {
+  F="$ROOT/content/pipeline/environment/git-workflow.md"
+  grep -q "immediate keep-open path for a verified block" "$F"
+  grep -q "cap path for a verified fix-now item" "$F"
 }
 
 # NOTE: work-beads skill drift (canonical content/agent-skills → generated

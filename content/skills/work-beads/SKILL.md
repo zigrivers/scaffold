@@ -346,9 +346,10 @@ every stale doc in this same PR. Check the project-invariants section of
 AGENTS.md (if the project defines one) before shipping.
 
 **2.5 Deliberate scope deferral = bead.** File a bead only when the task owner
-explicitly removes work from the current acceptance criteria or a verified defect
-outside the PR's required scope will not be fixed here, and only when that work
-passes all five follow-up gates in 2.7. A verified defect inside required scope is
+(the user or designated owner, not the working agent acting alone) explicitly
+removes work from the current acceptance criteria or a verified defect outside
+the PR's required scope will not be fixed here, and only when that work passes
+all five follow-up gates in 2.7. A verified defect inside required scope is
 `fix-now` or `block`, never a follow-up. Suggestions, severity labels, and
 unsupported or low-value findings do not create beads.
 

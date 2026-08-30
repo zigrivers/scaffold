@@ -102,8 +102,8 @@ mark which parts are queue-only.
   (8) sync main via `make main-sync && make
   prune-merged` — with step 5.5 = `mmr review --pr <N> --sync
   --format json` between creating the PR and the gate/enqueue steps,
-  including the 3-round cap and the explicit keep-open path for a verified
-  fix-now or block item that remains at the cap
+  including the immediate keep-open path for a verified block and the 3-round
+  cap path for a verified fix-now item that remains
 - (deep) `scripts/setup-agent-worktree.sh` is confirmed present via
   `scaffold agent-ops install --component git` + `scaffold agent-ops
   check` — not hand-authored; creates worktrees at the project-local
