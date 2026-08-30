@@ -129,6 +129,8 @@ ROOT="$BATS_TEST_DIRNAME/.."
   [[ "$NORMALIZED" == *"new cycle reviews the repaired exact head from round one"* ]]
   [[ "$NORMALIZED" == *"proposes an untrusted project configuration or persistent acknowledgment change"* ]]
   [[ "$NORMALIZED" == *"fewer than min_completed_channels"* ]]
+  [[ "$NORMALIZED" == *'Any unresolved findings at or above `fix_threshold`?'* ]] || false
+  [[ "$NORMALIZED" != *"when round 3 ends"* ]] || false
   [[ "$NORMALIZED" != *"contradictions that require human judgment"* ]]
 }
 
