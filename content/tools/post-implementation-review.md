@@ -734,7 +734,8 @@ and its exact evidence. The project is not ready to release.
    in-scope or required-safeguard blocker may start one only after a concrete
    repair, focused regression proof, and the required gate; review the new exact
    head from round one. No owner approval is required for in-scope remediation.
-   Stop only for the evidence-backed external conditions in Step 8.
+   Stop when the user asks to stop; otherwise stop only for the evidence-backed
+   external conditions in Step 8.
 7. **Document everything** — the report must show which channels ran, which were compensating, which were skipped, and the root cause for any degraded channel.
 8. **No auto-merge** — this tool modifies local files only. It never pushes, merges, or creates PRs.
 9. **Dispatch pattern cross-reference** — Phase 2 parallel dispatch uses `superpowers:dispatching-parallel-agents`. Each story subagent dispatches its own `superpowers:code-reviewer` as Channel 3. This two-level nesting is intentional and supported.

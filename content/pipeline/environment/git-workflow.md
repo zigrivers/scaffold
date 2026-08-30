@@ -380,10 +380,13 @@ Depth-gate per Methodology Scaling above.
    hypothetical, speculative, cosmetic, or already-dispositioned findings
    cannot restart review. No owner approval is required for in-scope
    remediation. Continue until every root cause has a disposition and no
-   verified fix-now or block item remains. Stop only for an external dependency,
-   missing credentials or authority, a destructive action, an out-of-scope
-   material product decision, or a demonstrated technical plateau after safe
-   approaches are exhausted. An unresolved required-safeguard defect is not a plateau.
+   verified fix-now or block item remains. For a verified rejection that still
+   blocks MMR, record the evidence, use `mmr ack add`, then recompute with `mmr
+   results`; never acknowledge a verified blocker. Stop when the user asks to
+   stop. Otherwise stop only for an external dependency, missing credentials or
+   authority, a destructive action, an out-of-scope material product decision,
+   or a demonstrated technical plateau after safe approaches are exhausted. An
+   unresolved required-safeguard defect is not a plateau.
    Merge only when the final exact head meets the configured MMR channel floor,
    required gates are green, every finding is dispositioned, and no verified
    blocker remains) ->

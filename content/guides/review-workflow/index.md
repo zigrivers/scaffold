@@ -134,7 +134,7 @@ exact derivation algorithm; this table is the *action* you take for each outcome
 | `pass` | 0 | **Proceed** — merge / push / next task. |
 | `degraded-pass` | 0 | **Proceed**, noting reduced coverage. The max achievable verdict once any channel was compensated. |
 | `blocked` | 2 | **Do not merge.** Fix the verified blocker, then re-review. |
-| `needs-user-decision` | 3 | **Do not merge.** Diagnose the cause; remediate in-scope defects or stop only for an external condition below. |
+| `needs-user-decision` | 3 | **Do not merge.** Restore the channel floor, verify any trust change, or apply the bounded-cycle and stopping rules below. |
 
 A review is `blocked` when any unacknowledged finding sits at or above the fix
 threshold (:sev[P2]{level=p2} by default; override per-run with
@@ -157,7 +157,7 @@ finding is always reported as `blocked`.
 `needs-user-decision`. A final-round in-scope blocker starts the bounded repair
 process below; it does not require owner approval. The wrappers report a PR as
 merge-ready only on `pass` / `degraded-pass`
-:cite[content/tools/review-pr.md:160].
+:cite[content/tools/review-pr.md:162].
 :::
 
 ## Step 4 — Fix blocking findings in bounded cycles
@@ -166,6 +166,12 @@ When the verdict is `blocked`, the loop is: verify each finding → repair the
 smallest root cause → add focused regression proof → run the required gate →
 review the new exact head. Every semantic finding receives one finite,
 evidence-backed disposition.
+
+If a verified refutation, duplicate, or stale finding still blocks MMR, copy the
+evidence into the PR disposition ledger, run `mmr ack add <finding-key> --job
+<job-id> --scope user --reason "reject: <evidence>"`, then recompute with `mmr
+results <job-id>`. The finding stays visible but no longer blocks. Never
+acknowledge a verified blocker or required-safeguard defect.
 
 ### Maximum three rounds per review cycle
 
@@ -182,16 +188,17 @@ response.
 
 Continue until every root cause has a disposition and no verified fix-now or
 block item remains. No owner approval is required for in-scope remediation.
-Stop only for a true external dependency, missing credentials or authority, a
-destructive action, a material product decision outside the acceptance
-criteria, or a demonstrated technical plateau after safe approaches are
-exhausted. Record exact evidence. An unresolved required safeguard is not a
-plateau; continue repairing it. Required safeguards include security, privacy,
-accessibility, data integrity, and project-specific product protections.
+Stop when the user asks to stop. Otherwise stop only for a true external
+dependency, missing credentials or authority, a destructive action, a material
+product decision outside the acceptance criteria, or a demonstrated technical
+plateau after safe approaches are exhausted. Record exact evidence. An
+unresolved required safeguard is not a plateau; continue repairing it. Required
+safeguards include security, privacy, accessibility, data integrity, and
+project-specific product protections.
 
 Merge only when the final exact head has completed the configured MMR channel
 floor, required gates are green, every finding is dispositioned, and no
-verified blocker remains :cite[content/tools/review-pr.md:158].
+verified blocker remains :cite[content/tools/review-pr.md:162].
 
 ### How the round budget is enforced
 

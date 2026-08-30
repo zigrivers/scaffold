@@ -126,3 +126,20 @@ ROOT="$BATS_TEST_DIRNAME/.."
   [[ "$NORMALIZED" == *"not a workflow stopping condition by itself"* ]]
   [[ "$NORMALIZED" == *"new cycle reviews the repaired exact head from round one"* ]]
 }
+
+@test "review policy preserves user stop and records evidence-backed refutations" {
+  F="$ROOT/docs/review-standards.md"
+  NORMALIZED="$(tr '\n' ' ' < "$F" | sed -E 's/[[:space:]]+/ /g')"
+  [[ "$NORMALIZED" == *"the user asks to stop"* ]]
+  [[ "$NORMALIZED" == *"mmr ack add"* ]]
+  [[ "$NORMALIZED" == *"mmr results"* ]]
+  [[ "$NORMALIZED" == *"Never acknowledge a verified"* ]]
+}
+
+@test "inconclusive findings receive a finite non-restart disposition" {
+  F="$ROOT/content/knowledge/core/multi-model-review-dispatch.md"
+  NORMALIZED="$(tr '\n' ' ' < "$F" | sed -E 's/[[:space:]]+/ /g')"
+  [[ "$NORMALIZED" == *"inconclusive"* ]]
+  [[ "$NORMALIZED" == *"cannot restart a cycle"* ]]
+  [[ "$NORMALIZED" == *"required safeguard"* ]]
+}

@@ -202,6 +202,14 @@ ROOT="$BATS_TEST_DIRNAME/.."
   grep -q "No owner approval is required" "$F"
 }
 
+@test "work-beads stop guidance is self-contained and honors the user" {
+  F="$ROOT/content/agent-skills/work-beads/SKILL.md"
+  ! grep -q "external conditions in Step 2.7" "$F"
+  grep -q "the user asks to stop" "$F"
+  grep -q "true external dependency" "$F"
+  grep -q "required-safeguard defect is not a plateau" "$F"
+}
+
 @test "Scaffold PR template records review evidence without requiring a Bead" {
   F="$ROOT/.github/pull_request_template.md"
   ! grep -q '^## Beads Task' "$F"

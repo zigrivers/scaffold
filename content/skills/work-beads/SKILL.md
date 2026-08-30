@@ -27,8 +27,12 @@ merge or `bd close` an enqueued bead yourself. (No merge queue installed? Land
 via the serialized merge slot instead — same finish line, you just do the
 merge.) Standing authorization: run the whole loop without asking permission. Do
 not end your turn after opening a draft PR with a list of "next steps" — that is
-the #1 observed agent failure. The only mid-loop stops are the external
-conditions in Step 2.7; an in-scope blocker starts or continues remediation.
+the #1 observed agent failure. Stop when the user asks to stop. Otherwise, the
+only mid-loop stops are a true external dependency, missing credentials or
+authority, a destructive action, a material product decision outside the
+acceptance criteria, or a demonstrated technical plateau after safe approaches
+are exhausted. An unresolved required-safeguard defect is not a plateau; an
+in-scope blocker starts or continues remediation.
 
 Invocation: `/work-beads` (1 bead) · `/work-beads N` (up to N beads, selected
 **one at a time at claim time** — N is a budget, not a reservation; never
@@ -386,6 +390,10 @@ fast on a saturated machine: `taskpolicy -c utility make check-affected`
   product safeguard required by project instructions.
 - Group repeated findings by root cause. Record exactly one finite disposition:
   `fix-now`, `block`, `reject:<reason>`, or `follow-up:<bead-id>`.
+- If a verified `reject:<reason>` still blocks MMR, copy the evidence to the PR
+  ledger, run `mmr ack add <finding-key> --job <job-id> --scope user --reason
+  "reject: <evidence>"`, then recompute with `mmr results <job-id>`. Never
+  acknowledge a verified `fix-now` or `block`.
 - A model's severity label never creates a bead. Create one follow-up per root cause
   only when the finding is reproducible, actionable, non-duplicate, worth scheduling,
   and outside the PR's required scope.
@@ -405,11 +413,11 @@ fast on a saturated machine: `taskpolicy -c utility make check-affected`
 - A verified acceptance-criteria or mandatory-guardrail defect blocks merge
   regardless of its model-assigned severity. A follow-up bead cannot make the
   current PR safe.
-- Stop only for a true external dependency, missing credentials or authority, a
-  destructive action, a material product decision outside the acceptance
-  criteria, or a demonstrated technical plateau after safe approaches are
-  exhausted. Record exact evidence. An unresolved required safeguard is not a
-  plateau; continue repairing it.
+- Stop when the user asks to stop. Otherwise stop only for a true external
+  dependency, missing credentials or authority, a destructive action, a material
+  product decision outside the acceptance criteria, or a demonstrated technical
+  plateau after safe approaches are exhausted. Record exact evidence. An
+  unresolved required safeguard is not a plateau; continue repairing it.
 - Merge only when the final exact head has completed the configured MMR channel
   floor, required gates are green, every finding is dispositioned, and no
   verified blocker remains.

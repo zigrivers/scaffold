@@ -291,8 +291,8 @@ way.
 - **Fix all blocking findings** (severity at or above `results.fix_threshold` in the verdict JSON; the project default lives in `.mmr.yaml` and is `P2` unless changed) before proceeding to the next task. Use `--fix-threshold P0|P1|P2|P3` on `scaffold run review-pr` / `review-code` to override per-invocation.
 - **Verdict handling** — proceed only on `pass` or `degraded-pass`; never merge
   on `blocked` or `needs-user-decision`. A verified in-scope blocker is repaired
-  under the bounded-cycle rule below. Stop only for the external conditions in
-  `docs/review-standards.md`.
+  under the bounded-cycle rule below. Stop when the user asks to stop; otherwise
+  stop only for the external conditions in `docs/review-standards.md`.
 - **Three rounds per cycle — native.** The `review-pr`/`review-code`
   meta-prompts pass `mmr review --session <target>-cycle-<C> --round <N>
   --max-rounds 3`. If round three exposes a reproducible in-scope or

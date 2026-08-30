@@ -64,10 +64,11 @@ and review the new exact head under a new session id.
 
 Duplicate, stale, hypothetical, speculative, cosmetic, or already-dispositioned
 findings cannot start a new cycle. Continue without owner approval until every
-finding has a finite disposition and no verified blocker remains. Stop only for
-an external dependency, missing credentials or authority, a destructive action,
-an out-of-scope material product decision, or a demonstrated technical plateau.
-An unresolved required safeguard is not a plateau.
+finding has a finite disposition and no verified blocker remains. Stop when the
+user asks to stop; otherwise stop only for an external dependency, missing
+credentials or authority, a destructive action, an out-of-scope material
+product decision, or a demonstrated technical plateau. An unresolved required
+safeguard is not a plateau.
 
 ## Async flow (without `--sync`)
 
@@ -155,6 +156,12 @@ mmr sessions list                      # iterative sessions (also: start | show 
 rounds (manage them with `mmr sessions`); `mmr reconcile` injects an external
 channel's findings (e.g. an agent reviewer) into an existing job so they
 reconcile with the CLI channels.
+
+For a verified refutation, duplicate, or stale finding that still blocks the
+verdict, record the evidence in the review ledger, run `mmr ack add <finding-key>
+--job <id> --scope user --reason "reject: <evidence>"`, then recompute with `mmr
+results <id>`. Never acknowledge a verified `fix-now`, `block`, or required-
+safeguard defect.
 
 ## Configuring channels
 

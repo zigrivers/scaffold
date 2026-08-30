@@ -1425,7 +1425,9 @@ When multiple channels return findings, mmr applies consensus rules:
 > review the new exact head from round one in a new cycle on the same PR. No
 > owner approval is required. Duplicate, stale, hypothetical, speculative,
 > cosmetic, or already-dispositioned findings cannot restart a cycle, and a PR
-> never merges with a verified blocker.
+> never merges with a verified blocker. Stop when the user asks to stop;
+> otherwise use only the evidence-backed stopping conditions in
+> `docs/review-standards.md`.
 
 ### How It Works
 

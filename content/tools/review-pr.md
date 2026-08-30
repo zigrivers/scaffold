@@ -144,12 +144,16 @@ cannot start a new cycle. Do not run extra rounds to obtain a cosmetically clean
 response.
 
 Use evidence to reproduce, refute, deduplicate, classify, and disposition every
-finding; a model's severity label alone does not decide. Stop only for a true
-external dependency, missing credentials or authority, a destructive action, a
-material product decision outside the acceptance criteria, or a demonstrated
-technical plateau after safe approaches are exhausted. An unresolved required
-safeguard is not a plateau. Surface channel auth failures with the recovery
-command MMR prints.
+finding; a model's severity label alone does not decide. If a verified
+`reject:<reason>` still blocks MMR, copy the evidence to the PR disposition
+ledger, run `mmr ack add <finding-key> --job <job-id> --scope user --reason
+"reject: <evidence>"`, then recompute with `mmr results <job-id>`. Never
+acknowledge a verified `fix-now` or `block`. Stop when the user asks to stop;
+otherwise stop only for a true external dependency, missing credentials or
+authority, a destructive action, a material product decision outside the
+acceptance criteria, or a demonstrated technical plateau after safe approaches
+are exhausted. An unresolved required safeguard is not a plateau. Surface
+channel auth failures with the recovery command MMR prints.
 
 ### Step 5: Report
 

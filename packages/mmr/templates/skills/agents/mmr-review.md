@@ -53,10 +53,11 @@ and review the new exact head under a new session id.
 
 Duplicate, stale, hypothetical, speculative, cosmetic, or already-dispositioned
 findings cannot start a new cycle. Continue without owner approval until every
-finding has a finite disposition and no verified blocker remains. Stop only for
-an external dependency, missing credentials or authority, a destructive action,
-an out-of-scope material product decision, or a demonstrated technical plateau.
-An unresolved required safeguard is not a plateau.
+finding has a finite disposition and no verified blocker remains. Stop when the
+user asks to stop; otherwise stop only for an external dependency, missing
+credentials or authority, a destructive action, an out-of-scope material
+product decision, or a demonstrated technical plateau. An unresolved required
+safeguard is not a plateau.
 
 ## Async flow (without `--sync`)
 

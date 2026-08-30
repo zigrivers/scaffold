@@ -28,8 +28,12 @@ merge or `bd close` an enqueued bead yourself. (No merge queue installed? Land
 via the serialized merge slot instead — same finish line, you just do the
 merge.) Standing authorization: run the whole loop without asking permission. Do
 not end your turn after opening a draft PR with a list of "next steps" — that is
-the #1 observed agent failure. The only mid-loop stops are the external
-conditions in Step 2.7; an in-scope blocker starts or continues remediation.
+the #1 observed agent failure. Stop when the user asks to stop. Otherwise, the
+only mid-loop stops are a true external dependency, missing credentials or
+authority, a destructive action, a material product decision outside the
+acceptance criteria, or a demonstrated technical plateau after safe approaches
+are exhausted. An unresolved required-safeguard defect is not a plateau; an
+in-scope blocker starts or continues remediation.
 
 Invocation: `/work-beads` (1 bead) · `/work-beads N` (up to N beads, selected
 **one at a time at claim time** — N is a budget, not a reservation; never

@@ -212,9 +212,10 @@ order:
 
 2. **Standing authorization** — verbatim: "Run this whole loop without asking
    permission; do not end your turn after opening a draft PR." An in-scope
-   blocker is repaired autonomously. Stop only for a true external dependency,
-   missing credentials or authority, a destructive action, an out-of-scope
-   material product decision, or a demonstrated technical plateau.
+   blocker is repaired autonomously. Stop when the user asks to stop. Otherwise
+   stop only for a true external dependency, missing credentials or authority,
+   a destructive action, an out-of-scope material product decision, or a
+   demonstrated technical plateau.
 
 3. **Parallel-safety hard rules** — the primary checkout is shared and
    read-only (agents work in worktrees, never commit there); one agent per

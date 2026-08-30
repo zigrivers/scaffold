@@ -188,10 +188,14 @@ Duplicate, stale, hypothetical, speculative, cosmetic, or already-dispositioned
 findings cannot start a new cycle. Do not dispatch extra rounds for a
 cosmetically clean model response.
 
-Stop only for a true external dependency, missing credentials or authority, a
-destructive action, a material product decision outside the acceptance
-criteria, or a demonstrated technical plateau after safe approaches are
-exhausted. An unresolved required safeguard is not a plateau.
+If a verified `reject:<reason>` still blocks MMR, record the evidence, run `mmr
+ack add <finding-key> --job <job-id> --scope user --reason "reject: <evidence>"`,
+then recompute with `mmr results <job-id>`. Never acknowledge a verified
+`fix-now` or `block`. Stop when the user asks to stop; otherwise stop only for a
+true external dependency, missing credentials or authority, a destructive
+action, a material product decision outside the acceptance criteria, or a
+demonstrated technical plateau after safe approaches are exhausted. An
+unresolved required safeguard is not a plateau.
 
 ### Step 5: Report
 

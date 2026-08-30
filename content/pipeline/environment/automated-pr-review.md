@@ -33,10 +33,14 @@ in-scope or required-safeguard defect, make a concrete repair, add focused
 regression proof, rerun the required gate, and review the new exact head from
 round one in a new bounded cycle. Duplicate, stale, hypothetical, speculative,
 cosmetic, or already-dispositioned findings cannot restart review. No owner
-approval is required for in-scope remediation. Stop only for an external
-dependency, missing credentials or authority, a destructive action, an
-out-of-scope material product decision, or a demonstrated technical plateau.
-An unresolved required safeguard is not a plateau.
+approval is required for in-scope remediation. For a verified rejection that
+still blocks MMR, record the evidence, use `mmr ack add <finding-key> --job
+<job-id> --scope user --reason "reject: <evidence>"`, then recompute with `mmr
+results <job-id>`; never acknowledge a verified blocker. Stop when the user asks
+to stop. Otherwise stop only for an external dependency, missing credentials or
+authority, a destructive action, an out-of-scope material product decision, or
+a demonstrated technical plateau. An unresolved required safeguard is not a
+plateau.
 Channel auth failures are always surfaced to the user with recovery
 commands — never silently skipped. When the target project has `scaffold`
 itself available, `scaffold run review-pr` and `scaffold run review-code`
@@ -208,7 +212,7 @@ overwrite or drop unrelated hooks):
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '.tool_input.command // empty' | grep -q 'gh pr create' && echo 'MANDATORY: run mmr review --pr <PR#> --sync --format json before moving on.\\nGroup duplicate findings by root cause and record one disposition: fix-now, block, reject:<reason>, or follow-up:<bead-id>. Severity alone never creates a bead. Follow-up work requires all five gates: reproducible, actionable, non-duplicate, worth scheduling, and outside scope.\\nMandatory guardrails include at minimum security, privacy, and data integrity, plus every repository or product safeguard required by project instructions.\\nMaximum of three rounds per review cycle. A round-three reproducible in-scope or required-safeguard blocker may start a new bounded cycle only after a concrete repair, focused regression proof, and the required gate pass; review the new exact head from round one. Duplicate, stale, hypothetical, speculative, cosmetic, or already-dispositioned findings cannot restart review. Continue until every root cause has a disposition and no verified fix-now or block item remains.\\nSurface channel auth failures with recovery commands (! codex login / ! agy -p \"hello\" / ! claude login) — never silently skip a channel.\\nSee docs/review-standards.md.' || true"
+            "command": "jq -r '.tool_input.command // empty' | grep -q 'gh pr create' && echo 'MANDATORY: run mmr review --pr <PR#> --sync --format json before moving on.\\nGroup duplicate findings by root cause and record one disposition: fix-now, block, reject:<reason>, or follow-up:<bead-id>. Severity alone never creates a bead. Follow-up work requires all five gates: reproducible, actionable, non-duplicate, worth scheduling, and outside scope.\\nMandatory guardrails include at minimum security, privacy, and data integrity, plus every repository or product safeguard required by project instructions.\\nMaximum of three rounds per review cycle. A round-three reproducible in-scope or required-safeguard blocker may start a new bounded cycle only after a concrete repair, focused regression proof, and the required gate pass; review the new exact head from round one. Duplicate, stale, hypothetical, speculative, cosmetic, or already-dispositioned findings cannot restart review. Continue until every root cause has a disposition and no verified fix-now or block item remains. For a verified rejection that still blocks MMR, record the evidence and use mmr ack add, then mmr results; never acknowledge a verified blocker. Stop when the user asks to stop.\\nSurface channel auth failures with recovery commands (! codex login / ! agy -p \"hello\" / ! claude login) — never silently skip a channel.\\nSee docs/review-standards.md.' || true"
           }
         ]
       }
@@ -257,12 +261,15 @@ gate, and review the new exact head from round one in a new bounded cycle.
 Duplicate, stale, hypothetical, speculative, cosmetic, or already-dispositioned
 findings cannot restart review. Continue until every root cause has a
 disposition and no verified fix-now or block item remains. No owner approval is
-required for in-scope remediation. Stop only for a true external dependency,
-missing credentials or authority, a destructive action, a material product
-decision outside the acceptance criteria, or a demonstrated technical plateau
-after safe approaches are exhausted. An unresolved required safeguard is not a
-plateau. Surface channel auth failures to the user with recovery commands;
-never silently skip a channel. A post-hook on `gh pr create` will remind you.
+required for in-scope remediation. For a verified rejection that still blocks
+MMR, record the evidence, use `mmr ack add`, then recompute with `mmr results`;
+never acknowledge a verified blocker. Stop when the user asks to stop. Otherwise
+stop only for a true external dependency, missing credentials or authority, a
+destructive action, a material product decision outside the acceptance criteria,
+or a demonstrated technical plateau after safe approaches are exhausted. An
+unresolved required safeguard is not a plateau. Surface channel auth failures to
+the user with recovery commands; never silently skip a channel. A post-hook on
+`gh pr create` will remind you.
 
 Merge only when the final exact head has completed the configured MMR channel
 floor, required gates are green, every finding is dispositioned, and no

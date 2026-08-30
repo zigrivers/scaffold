@@ -20,7 +20,9 @@ to at most three rounds. A round-three reproducible in-scope or
 required-safeguard blocker may start a new bounded cycle on the same PR only
 after a concrete repair, focused regression proof, and the required gate pass.
 Review the repaired exact head from round one. No owner approval is required
-for this in-scope remediation.
+for this in-scope remediation. Stop immediately when the user asks to stop;
+otherwise use only the evidence-backed stopping conditions in the source of
+truth.
 
 Do not restart for duplicate, stale, hypothetical, speculative, cosmetic, or
 already-dispositioned findings. Merge only after the final exact head meets the
