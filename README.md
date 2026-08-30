@@ -161,7 +161,7 @@ This gives you five skills:
 - **Pipeline reference skill** — shows pipeline ordering, dependencies, and phase structure
 - **Multi-model dispatch skill** — correct invocation patterns for Codex and Antigravity CLIs
 - **MMR skill** — runs `mmr review` before merging, and `mmr critique` for design review
-- **Work-beads skill** — works the project's Beads task queue end to end (claim → worktree → build → verify → review → merge → close)
+- **Work-beads skill** — works the project's Beads task queue end to end (claim → worktree → build → verify → bounded review → merge → close)
 
 **Usage** — just tell Claude Code what you want in natural language:
 ```
