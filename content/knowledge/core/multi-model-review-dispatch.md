@@ -220,10 +220,13 @@ When models actively disagree (one flags an issue, another says the same thing i
 2. **Check against source material.** Read the actual artifact and upstream docs. The correct answer is in the documents, not in model opinions.
 3. **Resolve from evidence, not labels.** Reproduce, refute, or identify the
    missing evidence. A model's severity label alone never controls the decision.
-   If reasonable reproduction remains inconclusive, record `reject:unverifiable`
-   with the missing evidence; it cannot restart a cycle. If the uncertainty
-   concerns a required safeguard, keep investigating or stop on the concrete
-   external dependency; never dismiss the safeguard as unverifiable.
+   If reasonable reproduction remains inconclusive, record
+   `block:inconclusive` with the missing evidence. It remains unresolved, must
+   not be acknowledged, and cannot restart a cycle until evidence proves a
+   genuine defect and a concrete repair exists. Keep investigating or stop on
+   a documented stopping condition. If the uncertainty concerns a required
+   safeguard, keep investigating or stop on the concrete external dependency;
+   never dismiss the safeguard as inconclusive.
 4. **Document the disagreement.** The reconciliation report should note: "Models disagreed on [topic]. Resolution: [decision and rationale]."
 
 ### Consensus Classification

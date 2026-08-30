@@ -168,12 +168,27 @@ ROOT="$BATS_TEST_DIRNAME/.."
   [[ "$NORMALIZED" == *"On resume"* ]] || false
   [[ "$NORMALIZED" == *"PR disposition ledger"* ]] || false
   [[ "$NORMALIZED" == *"MMR session history"* ]] || false
+  [[ "$NORMALIZED" == *"mmr sessions list"* ]] || false
+  [[ "$NORMALIZED" == *"mmr sessions show"* ]] || false
+  [[ "$NORMALIZED" == *"mmr-cycle-ledger"* ]] || false
+  [[ "$NORMALIZED" == *"do not start another review"* ]] || false
 }
 
 @test "inconclusive findings receive a finite non-restart disposition" {
   F="$ROOT/content/knowledge/core/multi-model-review-dispatch.md"
   NORMALIZED="$(tr '\n' ' ' < "$F" | sed -E 's/[[:space:]]+/ /g')"
   [[ "$NORMALIZED" == *"inconclusive"* ]] || false
+  [[ "$NORMALIZED" == *'`block:inconclusive`'* ]] || false
+  [[ "$NORMALIZED" != *'`reject:unverifiable`'* ]] || false
+  [[ "$NORMALIZED" == *"must not be acknowledged"* ]] || false
   [[ "$NORMALIZED" == *"cannot restart a cycle"* ]] || false
   [[ "$NORMALIZED" == *"required safeguard"* ]] || false
+}
+
+@test "local review resume uses the same concrete MMR session lookup" {
+  F="$ROOT/content/tools/review-code.md"
+  NORMALIZED="$(tr '\n' ' ' < "$F" | sed -E 's/[[:space:]]+/ /g')"
+  [[ "$NORMALIZED" == *"mmr sessions list"* ]] || false
+  [[ "$NORMALIZED" == *"mmr sessions show"* ]] || false
+  [[ "$NORMALIZED" == *"do not start another review"* ]] || false
 }

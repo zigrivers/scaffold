@@ -495,7 +495,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     // 2b. Trust gate — UNCONDITIONAL (before dry-run, job creation, and
     //     dispatch), so it can't be bypassed by omitting --sync or using
     //     --dry-run. A base-ref diff proposing project config/acks short-
-    //     circuits to needs-user-decision (exit 2) until a human ratifies.
+    //     circuits to needs-user-decision (exit 3) until a human ratifies.
     if (blockingConfigChange || blockingAckChange) {
       const outputFormat = (args.format ?? config.defaults.format ?? 'json') as OutputFormat
       const reason =
@@ -519,7 +519,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       console.log(outputFormat === 'json' ? JSON.stringify(decision, null, 2) : String(decision.summary))
       // exitCode + return (not process.exit) for consistency with the early
       // guards and so the handler stays unit-testable without mocking exit.
-      process.exitCode = 2
+      process.exitCode = 3
       return
     }
 

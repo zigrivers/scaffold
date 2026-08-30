@@ -74,8 +74,15 @@ without it every call looks like round 1. `CYCLE` and `ROUND` start at 1. A new
 cycle uses a new session id on the same PR (Step 4).
 
 ```bash
-# On resume, recover CYCLE and ROUND from the PR disposition ledger and MMR session history.
-# They are agent-carried, not shell state; use cycle 1 only with no prior review.
+# After every round, append one PR comment marker with the finite dispositions:
+# <!-- mmr-cycle-ledger cycle=<C> round=<R> head=<SHA> job=<ID> verdict=<V> next_cycle=<C> next_round=<R> -->
+# On resume, read markers with `gh pr view "$PR_NUMBER" --json comments`, select
+# the highest cycle and round, then cross-check it with MMR session history from `mmr sessions list` and
+# `mmr sessions show "pr-$PR_NUMBER-cycle-$LAST_CYCLE"`. The session's `rounds`
+# and final job must match the marker. Recover CYCLE and ROUND from next_cycle
+# and next_round. If the ledger and session disagree, do not start another review;
+# reconcile and record the missing evidence first. Use cycle 1 only when both
+# sources contain no prior review.
 CYCLE="${CYCLE:-1}"
 ROUND="${ROUND:-1}"
 MMR_FLAGS=(--pr "$PR_NUMBER" --session "pr-$PR_NUMBER-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json)

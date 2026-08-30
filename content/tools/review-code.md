@@ -89,8 +89,13 @@ state root; use cycle one only when no prior review exists for the target.
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 [ "$BRANCH" = "HEAD" ] && BRANCH="detached-$(git rev-parse --short HEAD 2>/dev/null)"
 SESSION_ID="local-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
-# On resume, recover CYCLE and ROUND from MMR session history under the state root.
-# They are agent-carried, not shell state; use cycle 1 only with no prior review.
+# On resume, run `mmr sessions list`, select the highest numeric cycle for the
+# exact `$SESSION_ID-cycle-` prefix, and confirm it with
+# `mmr sessions show "$SESSION_ID-cycle-$CYCLE"`. Set ROUND to the recorded
+# `rounds` plus one. If the record is missing or inconsistent, do not start another review;
+# reconcile the session evidence first. A recorded round 3 may
+# advance to a new cycle at round 1 only after Step 4's concrete repair and gate.
+# Use cycle 1 only when the list contains no prior review for this exact target.
 CYCLE="${CYCLE:-1}"
 ROUND="${ROUND:-1}"
 MMR_FLAGS=(--session "$SESSION_ID-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json)
