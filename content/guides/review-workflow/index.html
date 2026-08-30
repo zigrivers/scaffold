@@ -1553,14 +1553,16 @@ smallest root cause → add focused regression proof → run the required gate �
 review the new exact head. Every semantic finding receives one finite,
 evidence-backed disposition.</p>
 <p>If a verified refutation, duplicate, or stale finding still blocks MMR, copy the
-evidence into the PR disposition ledger, run <code>mmr ack add &#x3C;finding-key> --job &#x3C;job-id> --scope user --reason "reject: &#x3C;evidence>"</code>, then recompute with <code>mmr results &#x3C;job-id></code>. The finding stays visible but no longer blocks. Never
+evidence into the PR disposition ledger, run <code>mmr ack add &#x3C;finding-key> --job &#x3C;job-id> --scope job --reason "reject: &#x3C;evidence>"</code>, then recompute with <code>mmr results &#x3C;job-id></code>. The finding stays visible but no longer blocks. Never
 acknowledge a verified blocker or required-safeguard defect.</p>
 <h3 id="maximum-three-rounds-per-review-cycle">Maximum three rounds per review cycle</h3>
 <p>Each MMR session is one review cycle with at most three rounds. A cycle never
 dispatches round four. If round three finds a reproducible defect within the
 original acceptance criteria or a required safeguard, make a concrete repair,
 add focused regression proof, rerun the required gate, then start a new bounded
-cycle on the same PR. Reset the round to one and review the new exact head.</p>
+cycle on the same PR. Reset the round to one and review the new exact head.
+On resume, recover the active cycle and round from the PR disposition ledger and
+MMR session history; use cycle one only when neither contains a prior review.</p>
 <p>Duplicate, stale, hypothetical, speculative, cosmetic, or already-dispositioned
 findings cannot start a new cycle. A model's severity label alone never controls
 the decision, and no extra round runs merely to obtain a cosmetically clean

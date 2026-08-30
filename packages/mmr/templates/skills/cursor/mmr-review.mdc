@@ -56,6 +56,8 @@ reproducible defect within the original acceptance criteria or a required
 safeguard, make a concrete repair, add focused regression proof, pass the
 required gate, then start a new bounded cycle on the same PR. Reset to round one
 and review the new exact head under a new session id.
+On resume, recover the active cycle and round from the PR disposition ledger and
+MMR session history; use cycle one only when neither records a prior review.
 
 Duplicate, stale, hypothetical, speculative, cosmetic, or already-dispositioned
 findings cannot start a new cycle. Continue without owner approval until every

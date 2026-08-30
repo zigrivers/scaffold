@@ -217,6 +217,8 @@ ROOT="$BATS_TEST_DIRNAME/.."
   grep -q 'exact head' "$F"
   grep -q 'Disposition ledger' "$F"
   grep -q 'make check-all' "$F"
+  ! grep -q 'Verified blockers remaining: none' "$F"
+  grep -q 'Verified blockers remaining: <!--' "$F"
 }
 
 # NOTE: work-beads skill drift (canonical content/agent-skills → generated

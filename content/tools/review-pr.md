@@ -74,8 +74,8 @@ without it every call looks like round 1. `CYCLE` and `ROUND` start at 1. A new
 cycle uses a new session id on the same PR (Step 4).
 
 ```bash
-# CYCLE and ROUND are carried by YOU (the agent) across the fix loop — they are
-# not persistent shell state. Increment ROUND after a repair within a cycle.
+# On resume, recover CYCLE and ROUND from the PR disposition ledger and MMR session history.
+# They are agent-carried, not shell state; use cycle 1 only with no prior review.
 CYCLE="${CYCLE:-1}"
 ROUND="${ROUND:-1}"
 MMR_FLAGS=(--pr "$PR_NUMBER" --session "pr-$PR_NUMBER-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json)

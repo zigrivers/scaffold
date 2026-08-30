@@ -18,7 +18,7 @@ No Scaffold Bead. This repository does not use Beads for task tracking.
 - MMR cycle and round: <!-- cycle N, round N -->
 - Configured MMR channel floor met: <!-- result -->
 - Disposition ledger: <!-- one finite disposition per semantic finding -->
-- Verified blockers remaining: none
+- Verified blockers remaining: <!-- none, or list each blocker -->
 
 ## Checklist
 

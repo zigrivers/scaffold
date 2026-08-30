@@ -145,12 +145,22 @@ ROOT="$BATS_TEST_DIRNAME/.."
     "$ROOT/content/skills/mmr/SKILL.md" \
     "$ROOT/packages/mmr/templates/skills/agents/mmr-review.md" \
     "$ROOT/packages/mmr/templates/skills/cursor/mmr-review.mdc" \
-    "$ROOT/packages/mmr/templates/skills/opencode/mmr.md"; do
+    "$ROOT/packages/mmr/templates/skills/opencode/mmr.md" \
+    "$ROOT/content/guides/review-workflow/index.md" \
+    "$ROOT/content/guides/review-workflow/index.html"; do
     NORMALIZED="$(tr '\n' ' ' < "$F" | sed -E 's/[[:space:]]+/ /g')"
     [[ "$NORMALIZED" == *"--scope job"* ]] || false
     [[ "$NORMALIZED" != *"--scope user"* ]] || false
     [[ "$NORMALIZED" == *"Never acknowledge a verified"* ]] || false
   done
+}
+
+@test "review-pr resumes the recorded cycle instead of silently restarting cycle one" {
+  F="$ROOT/content/tools/review-pr.md"
+  NORMALIZED="$(tr '\n' ' ' < "$F" | sed -E 's/[[:space:]]+/ /g')"
+  [[ "$NORMALIZED" == *"On resume"* ]] || false
+  [[ "$NORMALIZED" == *"PR disposition ledger"* ]] || false
+  [[ "$NORMALIZED" == *"MMR session history"* ]] || false
 }
 
 @test "inconclusive findings receive a finite non-restart disposition" {

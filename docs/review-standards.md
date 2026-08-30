@@ -37,6 +37,8 @@ MMR enforces a **maximum of three rounds per review cycle**. The meta-prompts
 pass `--session <target>-cycle-<C> --round <N> --max-rounds 3`, incrementing
 `--round` after each repair. `--round` is required: without it, every call looks
 like round 1 and the cap never fires. A cycle never dispatches round 4.
+On resume, recover the active cycle and round from the PR disposition ledger and
+MMR session history; use cycle 1 only when neither records a prior review.
 
 Every semantic finding receives exactly one finite, evidence-backed
 disposition: `fix-now`, `block`, `reject:<reason>`, or an eligible follow-up.

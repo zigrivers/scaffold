@@ -169,7 +169,7 @@ evidence-backed disposition.
 
 If a verified refutation, duplicate, or stale finding still blocks MMR, copy the
 evidence into the PR disposition ledger, run `mmr ack add <finding-key> --job
-<job-id> --scope user --reason "reject: <evidence>"`, then recompute with `mmr
+<job-id> --scope job --reason "reject: <evidence>"`, then recompute with `mmr
 results <job-id>`. The finding stays visible but no longer blocks. Never
 acknowledge a verified blocker or required-safeguard defect.
 
@@ -180,6 +180,8 @@ dispatches round four. If round three finds a reproducible defect within the
 original acceptance criteria or a required safeguard, make a concrete repair,
 add focused regression proof, rerun the required gate, then start a new bounded
 cycle on the same PR. Reset the round to one and review the new exact head.
+On resume, recover the active cycle and round from the PR disposition ledger and
+MMR session history; use cycle one only when neither contains a prior review.
 
 Duplicate, stale, hypothetical, speculative, cosmetic, or already-dispositioned
 findings cannot start a new cycle. A model's severity label alone never controls
