@@ -68,7 +68,7 @@ If no PR is found, stop and tell the user to create a PR first.
 ### Step 2: Run MMR review (binding)
 
 One invocation. `--sync` is required for reconciliation, verdict, and exit
-codes. `--session pr-<N>-cycle-<C> --round <N> --max-rounds 3` enforces the
+codes. `--session pr-<repo>-<N>-cycle-<C> --round <N> --max-rounds 3` enforces the
 three-round budget **per cycle**. **`--round` is required for the cap to work:**
 without it every call looks like round 1. `CYCLE` and `ROUND` start at 1. A new
 cycle uses a new session id on the same PR (Step 4).
@@ -78,14 +78,29 @@ cycle uses a new session id on the same PR (Step 4).
 # <!-- mmr-cycle-ledger cycle=<C> round=<R> head=<SHA> job=<ID> verdict=<V> next_cycle=<C> next_round=<R> -->
 # On resume, read markers with `gh pr view "$PR_NUMBER" --json comments`, select
 # the highest cycle and round, then cross-check it with MMR session history from `mmr sessions list` and
-# `mmr sessions show "pr-$PR_NUMBER-cycle-$LAST_CYCLE"`. The session's `rounds`
+# `mmr sessions show "$SESSION_ID-cycle-$LAST_CYCLE"`. The session's `rounds`
 # and final job must match the marker. Recover CYCLE and ROUND from next_cycle
 # and next_round. If the ledger and session disagree, do not start another review;
 # reconcile and record the missing evidence first. Use cycle 1 only when both
 # sources contain no prior review.
-CYCLE="${CYCLE:-1}"
-ROUND="${ROUND:-1}"
-MMR_FLAGS=(--pr "$PR_NUMBER" --session "pr-$PR_NUMBER-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json)
+REPO_ID=$(
+  (git config --get remote.origin.url 2>/dev/null || git rev-parse --show-toplevel) |
+    git hash-object --stdin | cut -c1-12
+)
+SESSION_ID="pr-$REPO_ID-$PR_NUMBER"
+CURRENT_HEAD=$(gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid) || exit 1
+LEDGER_COMMENTS=$(gh pr view "$PR_NUMBER" --json comments --jq '.comments[].body') || exit 1
+LAST_REVIEWED_HEAD=$(printf '%s\n' "$LEDGER_COMMENTS" |
+  sed -nE 's/.*<!-- mmr-cycle-ledger .*head=([0-9a-f]{40}).*-->.*/\1/p' | tail -1)
+if [ -n "$LAST_REVIEWED_HEAD" ] && [ "$CURRENT_HEAD" = "$LAST_REVIEWED_HEAD" ]; then
+  echo "Current PR head already has an MMR ledger entry; disposition that job instead of dispatching a duplicate round." >&2
+  exit 1
+fi
+if [ -z "${CYCLE+x}" ] || [ -z "${ROUND+x}" ]; then
+  echo "Set CYCLE and ROUND from the verified review history before dispatching." >&2
+  exit 1
+fi
+MMR_FLAGS=(--pr "$PR_NUMBER" --session "$SESSION_ID-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json)
 [ -n "$FIX_THRESHOLD" ] && MMR_FLAGS+=(--fix-threshold "$FIX_THRESHOLD")
 # mmr exits 0 pass/degraded · 2 blocked · 3 needs-user-decision — the exit code
 # IS the verdict, so capture it without aborting (matters under `set -e`).

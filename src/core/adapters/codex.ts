@@ -42,6 +42,11 @@ const PHASE_ORDER = [
 // Source-of-truth meta-prompts: `content/tools/review-code.md` and
 // `content/tools/review-pr.md`. Keep the resolution chain and command
 // shape here in sync with those files, including native per-cycle round bounds.
+const CODEX_REPO_ID_SETUP = `REPO_ID=$(
+  (git config --get remote.origin.url 2>/dev/null || git rev-parse --show-toplevel) |
+    git hash-object --stdin | cut -c1-12
+)`
+
 const CODEX_RESUME_SETUP = `resolve_mmr_position() {
   local session_prefix="$1" latest_cycle session_json recorded_rounds override=false
 
@@ -132,7 +137,8 @@ if git diff --quiet "$MERGE_BASE"; then
 fi
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 [ "$BRANCH" = "HEAD" ] && BRANCH="detached-$(git rev-parse --short HEAD 2>/dev/null)"
-SESSION_ID="local-full-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
+${CODEX_REPO_ID_SETUP}
+SESSION_ID="local-full-$REPO_ID-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
 ${CODEX_RESUME_SETUP}
 resolve_mmr_position "$SESSION_ID-cycle-" || exit 1
 MMR_FLAGS=(--session "$SESSION_ID-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json)
@@ -147,7 +153,8 @@ git diff "$MERGE_BASE" | mmr review --diff - "\${MMR_FLAGS[@]}"
 \`\`\`bash
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 [ "$BRANCH" = "HEAD" ] && BRANCH="detached-$(git rev-parse --short HEAD 2>/dev/null)"
-SESSION_ID="local-staged-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
+${CODEX_REPO_ID_SETUP}
+SESSION_ID="local-staged-$REPO_ID-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
 ${CODEX_RESUME_SETUP}
 resolve_mmr_position "$SESSION_ID-cycle-" || exit 1
 mmr review --staged --session "$SESSION_ID-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json
@@ -158,7 +165,8 @@ mmr review --staged --session "$SESSION_ID-cycle-$CYCLE" --round "$ROUND" --max-
 
 \`\`\`bash
 BRANCH_NAME="<branch-name>"
-SESSION_ID="local-range-$(printf '%s' "$BRANCH_NAME" | tr -c 'a-zA-Z0-9_-' '-')"
+${CODEX_REPO_ID_SETUP}
+SESSION_ID="local-range-$REPO_ID-$(printf '%s' "$BRANCH_NAME" | tr -c 'a-zA-Z0-9_-' '-')"
 ${CODEX_RESUME_SETUP}
 resolve_mmr_position "$SESSION_ID-cycle-" || exit 1
 mmr review --base main --head "$BRANCH_NAME" --session "$SESSION_ID-cycle-$CYCLE" \
@@ -190,9 +198,20 @@ PR_NUMBER="\${PR_NUMBER:-$(gh pr view --json number -q .number 2>/dev/null)}"
 if [ -z "$PR_NUMBER" ]; then
   echo "PR_NUMBER not set and no PR for current branch"; exit 1
 fi
+${CODEX_REPO_ID_SETUP}
+SESSION_ID="pr-$REPO_ID-$PR_NUMBER"
+CURRENT_HEAD=$(gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid) || exit 1
+LEDGER_COMMENTS=$(gh pr view "$PR_NUMBER" --json comments --jq '.comments[].body') || exit 1
+LAST_REVIEWED_HEAD=$(printf '%s\\n' "$LEDGER_COMMENTS" |
+  sed -nE 's/.*<!-- mmr-cycle-ledger .*head=([0-9a-f]{40}).*-->.*/\\1/p' | tail -1)
+if [ -n "$LAST_REVIEWED_HEAD" ] && [ "$CURRENT_HEAD" = "$LAST_REVIEWED_HEAD" ]; then
+  echo "Current PR head already has an MMR ledger entry;" \
+    "disposition that job instead of dispatching a duplicate round." >&2
+  exit 1
+fi
 ${CODEX_RESUME_SETUP}
-resolve_mmr_position "pr-$PR_NUMBER-cycle-" || exit 1
-mmr review --pr "$PR_NUMBER" --session "pr-$PR_NUMBER-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json
+resolve_mmr_position "$SESSION_ID-cycle-" || exit 1
+mmr review --pr "$PR_NUMBER" --session "$SESSION_ID-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json
 \`\`\`
 
 Append \`--fix-threshold P0|P1|P2|P3\` to override the project's configured

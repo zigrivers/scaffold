@@ -36,7 +36,7 @@ ROOT="$BATS_TEST_DIRNAME/.."
 
 @test "review-pr.md resets round one in a fresh bounded remediation cycle" {
   F="$ROOT/content/tools/review-pr.md"
-  grep -q 'CYCLE="${CYCLE:-1}"' "$F"
+  grep -q 'Set CYCLE and ROUND from the verified review history' "$F"
   grep -Eq -- '--session.*cycle.*--round.*--max-rounds 3' "$F"
   grep -q 'reset.*ROUND.*1' "$F"
   grep -q 'same PR' "$F"
@@ -77,7 +77,7 @@ ROOT="$BATS_TEST_DIRNAME/.."
 @test "review-code.md uses the same bounded remediation-cycle contract" {
   F="$ROOT/content/tools/review-code.md"
   NORMALIZED="$(tr '\n' ' ' < "$F" | sed -E 's/[[:space:]]+/ /g')"
-  grep -q 'CYCLE="${CYCLE:-1}"' "$F"
+  grep -q 'Set CYCLE and ROUND from the verified review history' "$F"
   grep -Eq -- '--session.*cycle.*--round.*--max-rounds 3' "$F"
   [[ "$NORMALIZED" == *"Duplicate, stale, hypothetical, speculative, cosmetic, or already-dispositioned"* ]]
   [[ "$NORMALIZED" == *"new exact head"* ]]
@@ -212,4 +212,31 @@ ROOT="$BATS_TEST_DIRNAME/.."
     [[ "$NORMALIZED" == *"No owner approval is required"* ]]
     [[ "$NORMALIZED" == *"final exact head"* ]]
   done
+}
+
+@test "review session ids include repository identity" {
+  for F in "$ROOT/content/tools/review-pr.md" "$ROOT/content/tools/review-code.md"; do
+    grep -q 'REPO_ID=' "$F"
+    grep -q '\$REPO_ID' "$F"
+  done
+}
+
+@test "review meta-prompts fail closed instead of silently restarting cycle one" {
+  for F in "$ROOT/content/tools/review-pr.md" "$ROOT/content/tools/review-code.md"; do
+    ! grep -q 'CYCLE="${CYCLE:-1}"' "$F"
+    grep -q 'Set CYCLE and ROUND from the verified review history' "$F"
+  done
+}
+
+@test "review-pr refuses to redispatch an unchanged exact head" {
+  F="$ROOT/content/tools/review-pr.md"
+  grep -q 'LAST_REVIEWED_HEAD' "$F"
+  grep -q 'CURRENT_HEAD' "$F"
+  grep -q 'already has an MMR ledger entry' "$F"
+}
+
+@test "persistent trust changes remain a human authority stop" {
+  F="$ROOT/docs/review-standards.md"
+  NORMALIZED="$(tr '\n' ' ' < "$F" | sed -E 's/[[:space:]]+/ /g')"
+  [[ "$NORMALIZED" == *"until a human ratifies"* ]]
 }

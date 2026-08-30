@@ -183,6 +183,8 @@ describe('CodexAdapter', () => {
       expect(content).toContain('SESSION_ID="local-full-')
       expect(content).toContain('SESSION_ID="local-staged-')
       expect(content).toContain('SESSION_ID="local-range-')
+      expect(content).toContain('REPO_ID=$(')
+      expect(content).toContain('local-full-$REPO_ID-')
       expect(content).toMatch(/new exact head/i)
 
       // BASE_REF resolution mirrors content/tools/review-code.md (7-level ladder)
@@ -232,7 +234,9 @@ describe('CodexAdapter', () => {
       // Each remediation cycle keeps MMR's native three-round cap while a
       // verified in-scope repair can restart at round one on the same PR.
       expect(content).not.toContain('CYCLE="${CYCLE:-1}"')
-      expect(content).toContain('--session "pr-$PR_NUMBER-cycle-$CYCLE"')
+      expect(content).toContain('--session "$SESSION_ID-cycle-$CYCLE"')
+      expect(content).toContain('REPO_ID=$(')
+      expect(content).toMatch(/already has an MMR ledger entry/i)
       expect(content).toContain('--round "$ROUND" --max-rounds 3')
       expect(content).toContain('mmr sessions list')
       expect(content).toContain('mmr sessions show')
@@ -254,9 +258,15 @@ describe('CodexAdapter', () => {
 
       const script = `
 mmr() {
-  if [ "$1 $2" = "sessions list" ]; then printf '%s' "$MMR_SESSIONS"
-  elif [ "$1 $2" = "sessions show" ]; then printf '%s' "$MMR_SESSION"
+  if [ "$1 $2" = "sessions list" ]; then printf '%s' "$MMR_SESSIONS" | sed "s/__REPO_ID__/$REPO_ID/g"
+  elif [ "$1 $2" = "sessions show" ]; then printf '%s' "$MMR_SESSION" | sed "s/__REPO_ID__/$REPO_ID/g"
   elif [ "$1" = "review" ]; then printf 'REVIEW %s\\n' "$*"
+  else return 1
+  fi
+}
+gh() {
+  if [[ "$*" == *"--json headRefOid"* ]]; then printf '%s\\n' "$CURRENT_HEAD"
+  elif [[ "$*" == *"--json comments"* ]]; then printf '%s\\n' "$LEDGER_COMMENTS"
   else return 1
   fi
 }
@@ -265,40 +275,58 @@ ${recipe}
       const run = (sessions: string, session: string, extraEnv: Record<string, string> = {}) =>
         spawnSync('/bin/bash', ['-c', script], {
           encoding: 'utf8',
-          env: { ...process.env, PR_NUMBER: '42', MMR_SESSIONS: sessions, MMR_SESSION: session, ...extraEnv },
+          env: {
+            ...process.env,
+            PR_NUMBER: '42',
+            CURRENT_HEAD: '1111111111111111111111111111111111111111',
+            LEDGER_COMMENTS: '',
+            MMR_SESSIONS: sessions,
+            MMR_SESSION: session,
+            ...extraEnv,
+          },
         })
 
       const resumed = run(
-        JSON.stringify([{ session_id: 'pr-42-cycle-2', rounds: 1 }]),
-        JSON.stringify({ session_id: 'pr-42-cycle-2', rounds: 1 }),
+        JSON.stringify([{ session_id: 'pr-__REPO_ID__-42-cycle-2', rounds: 1 }]),
+        JSON.stringify({ session_id: 'pr-__REPO_ID__-42-cycle-2', rounds: 1 }),
       )
       expect(resumed.status).toBe(0)
-      expect(resumed.stdout).toContain('--session pr-42-cycle-2 --round 2 --max-rounds 3')
+      expect(resumed.stdout).toMatch(/--session pr-[0-9a-f]{12}-42-cycle-2 --round 2 --max-rounds 3/)
 
       const capped = run(
-        JSON.stringify([{ session_id: 'pr-42-cycle-2', rounds: 3 }]),
-        JSON.stringify({ session_id: 'pr-42-cycle-2', rounds: 3 }),
+        JSON.stringify([{ session_id: 'pr-__REPO_ID__-42-cycle-2', rounds: 3 }]),
+        JSON.stringify({ session_id: 'pr-__REPO_ID__-42-cycle-2', rounds: 3 }),
       )
       expect(capped.status).toBe(1)
       expect(capped.stderr).toMatch(/latest cycle reached round 3/i)
       expect(capped.stdout).not.toContain('REVIEW')
 
       const restarted = run(
-        JSON.stringify([{ session_id: 'pr-42-cycle-2', rounds: 3 }]),
-        JSON.stringify({ session_id: 'pr-42-cycle-2', rounds: 3 }),
+        JSON.stringify([{ session_id: 'pr-__REPO_ID__-42-cycle-2', rounds: 3 }]),
+        JSON.stringify({ session_id: 'pr-__REPO_ID__-42-cycle-2', rounds: 3 }),
         { CYCLE: '3', ROUND: '1' },
       )
       expect(restarted.status).toBe(0)
-      expect(restarted.stdout).toContain('--session pr-42-cycle-3 --round 1 --max-rounds 3')
+      expect(restarted.stdout).toMatch(/--session pr-[0-9a-f]{12}-42-cycle-3 --round 1 --max-rounds 3/)
 
       const staleOverride = run(
-        JSON.stringify([{ session_id: 'pr-42-cycle-2', rounds: 1 }]),
-        JSON.stringify({ session_id: 'pr-42-cycle-2', rounds: 1 }),
+        JSON.stringify([{ session_id: 'pr-__REPO_ID__-42-cycle-2', rounds: 1 }]),
+        JSON.stringify({ session_id: 'pr-__REPO_ID__-42-cycle-2', rounds: 1 }),
         { CYCLE: '1', ROUND: '1' },
       )
       expect(staleOverride.status).toBe(1)
       expect(staleOverride.stderr).toMatch(/does not match MMR session history/i)
       expect(staleOverride.stdout).not.toContain('REVIEW')
+
+      const duplicateHead = run('[]', '{}', {
+        LEDGER_COMMENTS:
+          '<!-- mmr-cycle-ledger cycle=1 round=1 ' +
+          'head=1111111111111111111111111111111111111111 job=mmr-example ' +
+          'verdict=pass next_cycle=1 next_round=2 -->',
+      })
+      expect(duplicateHead.status).toBe(1)
+      expect(duplicateHead.stderr).toMatch(/already has an MMR ledger entry/i)
+      expect(duplicateHead.stdout).not.toContain('REVIEW')
     })
 
     it('non-executor tools still use `scaffold run <slug>`', () => {

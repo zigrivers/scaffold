@@ -93,7 +93,11 @@ if [ "$STAGED_ONLY" = true ]; then REVIEW_SCOPE="staged"
 elif [ -n "$BASE_REF" ]; then REVIEW_SCOPE="range"
 else REVIEW_SCOPE="full"
 fi
-SESSION_ID="local-$REVIEW_SCOPE-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
+REPO_ID=$(
+  (git config --get remote.origin.url 2>/dev/null || git rev-parse --show-toplevel) |
+    git hash-object --stdin | cut -c1-12
+)
+SESSION_ID="local-$REVIEW_SCOPE-$REPO_ID-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
 # On resume, run `mmr sessions list`, select the highest numeric cycle for the
 # exact `$SESSION_ID-cycle-` prefix, and confirm it with
 # `mmr sessions show "$SESSION_ID-cycle-$CYCLE"`. Set ROUND to the recorded
@@ -101,8 +105,10 @@ SESSION_ID="local-$REVIEW_SCOPE-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-
 # reconcile the session evidence first. A recorded round 3 may
 # advance to a new cycle at round 1 only after Step 4's concrete repair and gate.
 # Use cycle 1 only when the list contains no prior review for this exact target.
-CYCLE="${CYCLE:-1}"
-ROUND="${ROUND:-1}"
+if [ -z "${CYCLE+x}" ] || [ -z "${ROUND+x}" ]; then
+  echo "Set CYCLE and ROUND from the verified review history before dispatching." >&2
+  exit 1
+fi
 MMR_FLAGS=(--session "$SESSION_ID-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json)
 [ -n "$FIX_THRESHOLD" ] && MMR_FLAGS+=(--fix-threshold "$FIX_THRESHOLD")
 ```
