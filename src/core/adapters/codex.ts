@@ -43,7 +43,7 @@ const PHASE_ORDER = [
 // `content/tools/review-pr.md`. Keep the resolution chain and command
 // shape here in sync with those files, including native per-cycle round bounds.
 const CODEX_RESUME_SETUP = `resolve_mmr_position() {
-  local session_prefix="$1" latest_cycle session_json recorded_rounds
+  local session_prefix="$1" latest_cycle session_json recorded_rounds override=false
 
   if [ -n "\${CYCLE+x}" ] || [ -n "\${ROUND+x}" ]; then
     if [ -z "\${CYCLE+x}" ] || [ -z "\${ROUND+x}" ]; then
@@ -54,7 +54,7 @@ const CODEX_RESUME_SETUP = `resolve_mmr_position() {
       echo "CYCLE must be positive and ROUND must be 1, 2, or 3." >&2
       return 1
     fi
-    return 0
+    override=true
   fi
 
   latest_cycle=$(mmr sessions list | node -e '
@@ -67,6 +67,10 @@ if (cycles.length) process.stdout.write(String(Math.max(...cycles)));
 ' "$session_prefix") || return 1
 
   if [ -z "$latest_cycle" ]; then
+    if [ "$override" = true ] && { [ "$CYCLE" -ne 1 ] || [ "$ROUND" -ne 1 ]; }; then
+      echo "CYCLE=$CYCLE ROUND=$ROUND does not match MMR session history; expected CYCLE=1 ROUND=1." >&2
+      return 1
+    fi
     CYCLE=1; ROUND=1
     return 0
   fi
@@ -77,6 +81,19 @@ const record = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
 if (!Number.isInteger(record.rounds) || record.rounds < 0 || record.rounds > 3) process.exit(1);
 process.stdout.write(String(record.rounds));
 ') || { echo "Invalid MMR session record; reconcile it before review." >&2; return 1; }
+
+  if [ "$override" = true ]; then
+    if [ "$CYCLE" -eq "$latest_cycle" ] && [ "$recorded_rounds" -lt 3 ] \
+      && [ "$ROUND" -eq "$((recorded_rounds + 1))" ]; then
+      return 0
+    fi
+    if [ "$CYCLE" -eq "$((latest_cycle + 1))" ] && [ "$recorded_rounds" -eq 3 ] \
+      && [ "$ROUND" -eq 1 ]; then
+      return 0
+    fi
+    echo "CYCLE=$CYCLE ROUND=$ROUND does not match MMR session history." >&2
+    return 1
+  fi
 
   if [ "$recorded_rounds" -ge 3 ]; then
     echo "Latest cycle reached round 3. After a verified repair and required gate," \
@@ -108,18 +125,20 @@ elif git rev-parse --verify HEAD~1        >/dev/null 2>&1; then BASE_REF=HEAD~1
 else                                                            BASE_REF=HEAD
 fi
 MERGE_BASE=$(git merge-base "$BASE_REF" HEAD 2>/dev/null || echo "$BASE_REF")
+# --quiet exits 0 when there's no diff. Check before session recovery so a
+# no-change review does not require mmr to be installed or authenticated.
+if git diff --quiet "$MERGE_BASE"; then
+  echo "No changes to review"; exit 0
+fi
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 [ "$BRANCH" = "HEAD" ] && BRANCH="detached-$(git rev-parse --short HEAD 2>/dev/null)"
-SESSION_ID="local-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
+SESSION_ID="local-full-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
 ${CODEX_RESUME_SETUP}
 resolve_mmr_position "$SESSION_ID-cycle-" || exit 1
 MMR_FLAGS=(--session "$SESSION_ID-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json)
 
-# --quiet exits 0 when there's no diff. Streams the diff directly into mmr
-# rather than buffering through a shell variable (large diffs can OOM).
-if git diff --quiet "$MERGE_BASE"; then
-  echo "No changes to review"; exit 0
-fi
+# Stream the diff directly into mmr rather than buffering through a shell
+# variable (large diffs can OOM).
 git diff "$MERGE_BASE" | mmr review --diff - "\${MMR_FLAGS[@]}"
 \`\`\`
 
@@ -128,7 +147,7 @@ git diff "$MERGE_BASE" | mmr review --diff - "\${MMR_FLAGS[@]}"
 \`\`\`bash
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 [ "$BRANCH" = "HEAD" ] && BRANCH="detached-$(git rev-parse --short HEAD 2>/dev/null)"
-SESSION_ID="local-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
+SESSION_ID="local-staged-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
 ${CODEX_RESUME_SETUP}
 resolve_mmr_position "$SESSION_ID-cycle-" || exit 1
 mmr review --staged --session "$SESSION_ID-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json
@@ -139,7 +158,7 @@ mmr review --staged --session "$SESSION_ID-cycle-$CYCLE" --round "$ROUND" --max-
 
 \`\`\`bash
 BRANCH_NAME="<branch-name>"
-SESSION_ID="local-$(printf '%s' "$BRANCH_NAME" | tr -c 'a-zA-Z0-9_-' '-')"
+SESSION_ID="local-range-$(printf '%s' "$BRANCH_NAME" | tr -c 'a-zA-Z0-9_-' '-')"
 ${CODEX_RESUME_SETUP}
 resolve_mmr_position "$SESSION_ID-cycle-" || exit 1
 mmr review --base main --head "$BRANCH_NAME" --session "$SESSION_ID-cycle-$CYCLE" \

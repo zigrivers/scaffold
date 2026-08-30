@@ -192,3 +192,24 @@ ROOT="$BATS_TEST_DIRNAME/.."
   [[ "$NORMALIZED" == *"mmr sessions show"* ]] || false
   [[ "$NORMALIZED" == *"do not start another review"* ]] || false
 }
+
+@test "local review modes keep independent bounded session budgets" {
+  F="$ROOT/content/tools/review-code.md"
+  grep -q 'REVIEW_SCOPE="staged"' "$F"
+  grep -q 'REVIEW_SCOPE="range"' "$F"
+  grep -q 'REVIEW_SCOPE="full"' "$F"
+  grep -q 'SESSION_ID="local-$REVIEW_SCOPE-' "$F"
+}
+
+@test "lean work-beads variants retain the autonomous restart safeguards" {
+  for F in \
+    "$ROOT/content/skills/work-beads/agents-block.md" \
+    "$ROOT/content/skills/work-beads/cursor.mdc"; do
+    NORMALIZED="$(tr '\n' ' ' < "$F" | sed -E 's/[[:space:]]+/ /g')"
+    [[ "$NORMALIZED" == *"concrete repair"* ]]
+    [[ "$NORMALIZED" == *"focused regression proof"* ]]
+    [[ "$NORMALIZED" == *"Duplicate, stale, hypothetical, speculative, cosmetic"* ]]
+    [[ "$NORMALIZED" == *"No owner approval is required"* ]]
+    [[ "$NORMALIZED" == *"final exact head"* ]]
+  done
+}

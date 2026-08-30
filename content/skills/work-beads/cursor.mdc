@@ -35,6 +35,15 @@ acceptance criteria, or a demonstrated technical plateau after safe approaches
 are exhausted. An unresolved required-safeguard defect is not a plateau; an
 in-scope blocker starts or continues remediation.
 
+Each review cycle has at most three rounds. A genuine round-three in-scope or
+required-safeguard blocker starts a new cycle only after a concrete repair,
+focused regression proof, and the required gate; review the new exact head from
+round one. Duplicate, stale, hypothetical, speculative, cosmetic, and already-
+dispositioned findings cannot restart review. No owner approval is required for
+in-scope remediation. Merge only when the final exact head meets the channel
+floor, all required gates pass, every finding is dispositioned, and no verified
+blocker remains.
+
 Invocation: `/work-beads` (1 bead) · `/work-beads N` (up to N beads, selected
 **one at a time at claim time** — N is a budget, not a reservation; never
 pre-pick a list) · `/work-beads N <label>` (same, scoped to a label) ·

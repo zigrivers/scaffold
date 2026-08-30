@@ -88,7 +88,12 @@ state root; use cycle one only when no prior review exists for the target.
 # "HEAD") fall back to the short commit so distinct reviews don't collide.
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 [ "$BRANCH" = "HEAD" ] && BRANCH="detached-$(git rev-parse --short HEAD 2>/dev/null)"
-SESSION_ID="local-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
+STAGED_ONLY=false; [[ "$ARGUMENTS" == *--staged* ]] && STAGED_ONLY=true
+if [ "$STAGED_ONLY" = true ]; then REVIEW_SCOPE="staged"
+elif [ -n "$BASE_REF" ]; then REVIEW_SCOPE="range"
+else REVIEW_SCOPE="full"
+fi
+SESSION_ID="local-$REVIEW_SCOPE-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
 # On resume, run `mmr sessions list`, select the highest numeric cycle for the
 # exact `$SESSION_ID-cycle-` prefix, and confirm it with
 # `mmr sessions show "$SESSION_ID-cycle-$CYCLE"`. Set ROUND to the recorded
@@ -107,8 +112,6 @@ Exactly ONE invocation runs, routed by scope (this is a single script — the
 review output so Step 3 has a real `JOB_ID`:
 
 ```bash
-STAGED_ONLY=false; [[ "$ARGUMENTS" == *--staged* ]] && STAGED_ONLY=true
-
 # mmr exits 0 pass/degraded · 2 blocked · 3 needs-user-decision — the exit code
 # IS the verdict, so capture it without aborting the routing (matters under
 # `set -e`); `|| MMR_EXIT=$?` on each branch does that.

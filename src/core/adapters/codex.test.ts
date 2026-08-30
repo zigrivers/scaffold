@@ -180,6 +180,9 @@ describe('CodexAdapter', () => {
       expect(content).toContain('mmr sessions show')
       expect(content).toMatch(/latest cycle reached round 3/i)
       expect(content).toMatch(/set both CYCLE and ROUND/i)
+      expect(content).toContain('SESSION_ID="local-full-')
+      expect(content).toContain('SESSION_ID="local-staged-')
+      expect(content).toContain('SESSION_ID="local-range-')
       expect(content).toMatch(/new exact head/i)
 
       // BASE_REF resolution mirrors content/tools/review-code.md (7-level ladder)
@@ -280,9 +283,22 @@ ${recipe}
       expect(capped.stderr).toMatch(/latest cycle reached round 3/i)
       expect(capped.stdout).not.toContain('REVIEW')
 
-      const restarted = run('[]', '{}', { CYCLE: '3', ROUND: '1' })
+      const restarted = run(
+        JSON.stringify([{ session_id: 'pr-42-cycle-2', rounds: 3 }]),
+        JSON.stringify({ session_id: 'pr-42-cycle-2', rounds: 3 }),
+        { CYCLE: '3', ROUND: '1' },
+      )
       expect(restarted.status).toBe(0)
       expect(restarted.stdout).toContain('--session pr-42-cycle-3 --round 1 --max-rounds 3')
+
+      const staleOverride = run(
+        JSON.stringify([{ session_id: 'pr-42-cycle-2', rounds: 1 }]),
+        JSON.stringify({ session_id: 'pr-42-cycle-2', rounds: 1 }),
+        { CYCLE: '1', ROUND: '1' },
+      )
+      expect(staleOverride.status).toBe(1)
+      expect(staleOverride.stderr).toMatch(/does not match MMR session history/i)
+      expect(staleOverride.stdout).not.toContain('REVIEW')
     })
 
     it('non-executor tools still use `scaffold run <slug>`', () => {
