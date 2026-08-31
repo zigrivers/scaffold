@@ -389,7 +389,7 @@ prune`. Long local test loops run at reduced priority so the merge lane stays
 fast on a saturated machine: `taskpolicy -c utility make check-affected`
 (macOS; skip the wrapper where `taskpolicy` is absent).
 
-**2.7 Review and merge:** `mmr review --pr <N> --sync --format json`.
+**2.7 Review and merge:** `mmr review --pr <N> --session pr-<repo-id>-<N>-cycle-<C> --round <R> --max-rounds 3 --sync --format json`.
 - Check the diff is uncontaminated first: `gh pr diff <N> --name-only` shows
   only your intended surface.
 - Surface channel auth failures to the user with recovery commands; never

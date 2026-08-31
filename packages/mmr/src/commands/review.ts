@@ -100,6 +100,22 @@ function resolveDiff(args: ReviewArgs): string {
   return execFileSync('git', ['diff'], { encoding: 'utf-8', maxBuffer: MAX_DIFF_BUFFER })
 }
 
+/** Resolve the immutable identity needed to distinguish equal patches on different PR heads. */
+function resolveReviewTarget(args: ReviewArgs): string | undefined {
+  if (args.pr === undefined) return undefined
+  const raw = execFileSync(
+    'gh',
+    ['pr', 'view', String(args.pr), '--json', 'url,headRefOid'],
+    { encoding: 'utf-8', maxBuffer: MAX_DIFF_BUFFER },
+  )
+  const parsed = JSON.parse(raw) as { url?: unknown; headRefOid?: unknown }
+  if (typeof parsed.url !== 'string' || typeof parsed.headRefOid !== 'string'
+    || !/^[0-9a-f]{40,64}$/i.test(parsed.headRefOid)) {
+    throw new Error(`Could not resolve exact head for PR #${args.pr}`)
+  }
+  return `${parsed.url}@${parsed.headRefOid.toLowerCase()}`
+}
+
 /** Stamp proposed config/ack changes onto an output object (trust transparency). */
 function annotateProposedChanges(target: Record<string, unknown>, changes: ConfigChangeReport): void {
   if (changes.ack_files_changed.length > 0) target.proposed_acks = changes.ack_files_changed
@@ -121,6 +137,7 @@ function duplicateSessionTarget(
   sessionId: string,
   diff: string,
   round: number | undefined,
+  reviewTarget: string | undefined,
 ): string | undefined {
   const jobStore = new JobStore(resolveJobsDir())
   const record = sessionStore.show(sessionId)
@@ -131,13 +148,19 @@ function duplicateSessionTarget(
       candidate.session_id.startsWith(cycleMatch[1]) &&
       /^[1-9][0-9]*$/.test(candidate.session_id.slice(cycleMatch[1].length)),
     )
-  const matchingJobs = records.flatMap((candidate) => candidate.jobs).filter((jobId) => {
+  const matchingJobs = records.flatMap((candidate) => candidate.jobs.map((jobId) => ({
+    jobId,
+    sessionId: candidate.session_id,
+  }))).filter(({ jobId, sessionId: candidateSessionId }) => {
     try {
-      return jobStore.loadDiff(jobId) === diff
+      if (jobStore.loadDiff(jobId) !== diff) return false
+      if (reviewTarget === undefined) return true
+      const priorTarget = jobStore.loadJob(jobId).review_target
+      return priorTarget === reviewTarget || (priorTarget === undefined && candidateSessionId === sessionId)
     } catch {
       return false
     }
-  })
+  }).map(({ jobId }) => jobId)
   if (matchingJobs.length === 0) return undefined
 
   const priorJobId = record?.jobs.at(-1)
@@ -576,15 +599,6 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     let sessionLink: { store: SessionStore; id: string } | undefined
     if (args.session !== undefined) {
       sessionLink = { store: getSessionStore(), id: args.session }
-      const duplicateJob = duplicateSessionTarget(sessionLink.store, sessionLink.id, diff, args.round)
-      if (duplicateJob !== undefined) {
-        console.error(
-          `Exact review target already dispatched in ${duplicateJob}; ` +
-          'disposition that job instead of consuming another round.',
-        )
-        process.exitCode = 1
-        return
-      }
     }
 
     // 3. Determine enabled channels — channels_disabled applies to the default list only;
@@ -692,6 +706,25 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       process.exit(1)
     }
 
+    const reviewTarget = resolveReviewTarget(args)
+    if (sessionLink !== undefined) {
+      const duplicateJob = duplicateSessionTarget(
+        sessionLink.store,
+        sessionLink.id,
+        diff,
+        args.round,
+        reviewTarget,
+      )
+      if (duplicateJob !== undefined) {
+        console.error(
+          `Exact review target already dispatched in ${duplicateJob}; ` +
+          'disposition that job instead of consuming another round.',
+        )
+        process.exitCode = 1
+        return
+      }
+    }
+
     // 5. Create job
     const jobsDir = resolveJobsDir()
     const store = new JobStore(jobsDir)
@@ -702,6 +735,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       channels: channelNames,
       session_id: args.session,
       round: args.round,
+      review_target: reviewTarget,
       review_controls: reviewControls,
       // Persist trust context so the pipeline re-surfaces it on every run.
       trust_mode: trust.trust_mode,

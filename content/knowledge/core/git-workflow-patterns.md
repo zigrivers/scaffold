@@ -93,8 +93,8 @@ Standard PR lifecycle (the harmonized 8-step workflow, with mandatory AI review 
 3. Rebase onto latest `origin/main`
 4. Push the branch
 5. Create the PR with a structured description
-   - **Step 5.5 — mandatory AI review**: `mmr review --pr <N> --sync
-     --format json` (finite root-cause dispositions; at most three rounds per
+   - **Step 5.5 — mandatory AI review**: `mmr review --pr <N> --session pr-<repo-id>-<N>-cycle-<C>
+     --round <R> --max-rounds 3 --sync --format json` (finite root-cause dispositions; at most three rounds per
      cycle; a repaired round-three in-scope blocker restarts at round one in a
      new bounded cycle on the same PR)
 6. Watch the local quality gates — pre-commit hooks ran, `make check-affected`
@@ -130,7 +130,7 @@ until a launch or deploy target is chosen:
    per-merge gate; full `make check` is the safety net)
 3. **Agent self-review** — re-read the diff against the project's coding
    standards before pushing
-4. **`mmr review --pr <N> --sync --format json`** — mandatory multi-model AI
+4. **`mmr review --pr <N> --session pr-<repo-id>-<N>-cycle-<C> --round <R> --max-rounds 3 --sync --format json`** — mandatory multi-model AI
    review (finite root-cause dispositions and at most three rounds per bounded
    remediation cycle)
 

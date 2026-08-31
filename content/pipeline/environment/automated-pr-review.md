@@ -1,7 +1,7 @@
 ---
 name: automated-pr-review
-description: "Agent-driven automated code review via MMR — the generated project's mandatory entry point is direct `mmr review --pr <N> --sync --format json`, not a scaffold wrapper, for PR and non-PR targets"
-summary: "Configures agent-driven automated code review: mandatory after `gh pr create` and also usable on any non-PR target. The entry point is direct `mmr review --pr <N> --sync --format json` (Codex, Antigravity, Claude) with finite root-cause dispositions and at most three rounds per bounded remediation cycle; `scaffold run review-pr` / `scaffold run review-code` add the Superpowers channel when scaffold is present. A GitHub App reviewer is a fallback when CLIs are unavailable."
+description: "Agent-driven MMR review. Generated projects use direct bounded mmr review with explicit session, round, and three-round cycle because Scaffold is optional. Covers PR and non-PR targets."
+summary: "Configures agent-driven automated code review: mandatory after `gh pr create` and also usable on any non-PR target. The direct `mmr review` entry point carries explicit session, round, and three-round cycle bounds (Codex, Antigravity, Claude), with finite root-cause dispositions; `scaffold run review-pr` / `scaffold run review-code` add the Superpowers channel when scaffold is present. A GitHub App reviewer is a fallback when CLIs are unavailable."
 phase: "environment"
 order: 340
 dependencies: [git-workflow]
@@ -15,7 +15,8 @@ knowledge-base: [review-methodology, automated-review-tooling]
 Configure an agent-driven automated code review system using local CLI
 reviewers dispatched through MMR (Codex, Antigravity, Claude — runs all
 three when available). The mandatory entry point in the generated project is
-direct `mmr review --pr <N> --sync --format json` — not a scaffold wrapper,
+direct `mmr review --pr <N> --session pr-<repo-id>-<N>-cycle-<C> --round <R>
+--max-rounds 3 --sync --format json` — not a scaffold wrapper,
 since the generated project cannot assume `scaffold` itself is installed.
 The review is mandatory after `gh pr create` and also runs on non-PR targets
 (local staged/unstaged code, branch diffs, specific files) via the same
@@ -85,8 +86,9 @@ review-fix loop locally.
 - (mvp) Post-PR-creation hook configured in settings to remind agents to run
   `mmr review --pr`, installed only if `.claude/settings.json` doesn't
   already carry an equivalent `gh pr create` reminder
-- (mvp) CLAUDE.md documents `mmr review --pr <N> --sync --format json` as the
-  mandatory PR-review entry point, not a scaffold wrapper
+- (mvp) CLAUDE.md documents direct `mmr review --pr <N>` with a stable
+  repository/PR session, explicit cycle, explicit round, and `--max-rounds 3`
+  as the mandatory PR-review entry point, not a scaffold wrapper
 - (mvp) CLAUDE.md documents finite root-cause dispositions, the five follow-up
   gates, a maximum of three rounds per review cycle, autonomous bounded
   remediation, and acceptance-criteria or mandatory-guardrail defects as
@@ -141,7 +143,8 @@ Check if AGENTS.md exists first. If it exists, check for scaffold tracking comme
   scope expanded beyond PRs (e.g., MMR now supports staged / diff / branch
   / file targets), the CLAUDE.md block or hook still references
   `/scaffold:review-pr` as the mandatory entry point (pre-D8 wording)
-  instead of direct `mmr review --pr <N> --sync --format json`
+  instead of direct bounded `mmr review --pr <N>` with explicit session,
+  cycle, round, and `--max-rounds 3`
 - **Conflict resolution**: if review criteria changed in coding-standards.md,
   update AGENTS.md review rules to match; if additional CLI reviewers have
   become available, offer to enable the full three-CLI MMR flow (Codex,
@@ -212,7 +215,7 @@ overwrite or drop unrelated hooks):
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '.tool_input.command // empty' | grep -q 'gh pr create' && echo 'MANDATORY: run mmr review --pr <PR#> --sync --format json before moving on.\\nGroup duplicate findings by root cause and record one disposition: fix-now, block, reject:<reason>, or follow-up:<bead-id>. Severity alone never creates a bead. Follow-up work requires all five gates: reproducible, actionable, non-duplicate, worth scheduling, and outside scope.\\nMandatory guardrails include at minimum security, privacy, and data integrity, plus every repository or product safeguard required by project instructions.\\nMaximum of three rounds per review cycle. A round-three reproducible in-scope or required-safeguard blocker may start a new bounded cycle only after a concrete repair, focused regression proof, and the required gate pass; review the new exact head from round one. Duplicate, stale, hypothetical, speculative, cosmetic, or already-dispositioned findings cannot restart review. Continue until every root cause has a disposition and no verified fix-now or block item remains. For a verified rejection that still blocks MMR, record the evidence and use mmr ack add, then mmr results; never acknowledge a verified blocker. Stop when the user asks to stop.\\nSurface channel auth failures with recovery commands (! codex login / ! agy -p \"hello\" / ! claude login) — never silently skip a channel.\\nSee docs/review-standards.md.' || true"
+            "command": "jq -r '.tool_input.command // empty' | grep -q 'gh pr create' && echo 'MANDATORY: run mmr review --pr <PR#> --session pr-<repo-id>-<PR#>-cycle-<C> --round <R> --max-rounds 3 --sync --format json before moving on. Use a stable repository hash, keep the cycle fixed, and advance rounds only from 1 through 3.\\nGroup duplicate findings by root cause and record one disposition: fix-now, block, reject:<reason>, or follow-up:<bead-id>. Severity alone never creates a bead. Follow-up work requires all five gates: reproducible, actionable, non-duplicate, worth scheduling, and outside scope.\\nMandatory guardrails include at minimum security, privacy, and data integrity, plus every repository or product safeguard required by project instructions.\\nMaximum of three rounds per review cycle. A round-three reproducible in-scope or required-safeguard blocker may start a new bounded cycle only after a concrete repair, focused regression proof, and the required gate pass; review the new exact head from round one. Duplicate, stale, hypothetical, speculative, cosmetic, or already-dispositioned findings cannot restart review. Continue until every root cause has a disposition and no verified fix-now or block item remains. For a verified rejection that still blocks MMR, record the evidence and use mmr ack add, then mmr results; never acknowledge a verified blocker. Stop when the user asks to stop.\\nSurface channel auth failures with recovery commands (! codex login / ! agy -p \"hello\" / ! claude login) — never silently skip a channel.\\nSee docs/review-standards.md.' || true"
           }
         ]
       }
@@ -246,9 +249,12 @@ markers, replace it in place and add the markers.
 ## Code Review
 
 <!-- scaffold:automated-pr-review:claude-md start -->
-**Mandatory after `gh pr create`** — run `mmr review --pr <N> --sync --format
-json` to execute all three review channels (Codex CLI, Antigravity CLI,
-Claude CLI). Group duplicate findings by root cause and record one disposition:
+**Mandatory after `gh pr create`** — run `mmr review --pr <N> --session
+pr-<repo-id>-<N>-cycle-<C> --round <R> --max-rounds 3 --sync --format json` to
+execute all three review channels (Codex CLI, Antigravity CLI, Claude CLI).
+Use a stable hash of the repository remote for `<repo-id>`, keep `<C>` fixed
+within one bounded cycle, and use `<R>` from 1 through 3. Group duplicate
+findings by root cause and record one disposition:
 `fix-now`, `block`, `reject:<reason>`, or `follow-up:<bead-id>`. Severity alone
 never creates a bead. Follow-up work requires all five gates: reproducible,
 actionable, non-duplicate, worth scheduling, and outside scope. Mandatory
@@ -286,7 +292,7 @@ the same MMR job — use them for the extra pass; they are not required.
 
 | When | Command |
 |------|---------|
-| After creating a PR | `mmr review --pr <N> --sync --format json` |
+| After creating a PR | `mmr review --pr <N> --session pr-<repo-id>-<N>-cycle-<C> --round <R> --max-rounds 3 --sync --format json` |
 | Staged changes only | `mmr review --staged --sync --format json` |
 | All tracked uncommitted changes (staged + unstaged, no untracked) | `git diff HEAD \| mmr review --diff - --sync --format json` |
 | Branch diff | `mmr review --base <ref> --head <ref> --sync --format json` |

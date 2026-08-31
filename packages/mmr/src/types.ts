@@ -108,6 +108,8 @@ export interface JobMetadata {
   session_id?: string
   /** One-based round counter within a session (T2-B). */
   round?: number
+  /** Exact review target, such as a PR URL plus head object ID. */
+  review_target?: string
   /** Parsed review loop/security controls used for this invocation. */
   review_controls?: ReviewControls
   /**

@@ -16,6 +16,7 @@ export interface CreateJobOpts {
   channels: string[]
   session_id?: string
   round?: number
+  review_target?: string
   review_controls?: ReviewControls
   trust_mode?: 'base-ref' | 'untrusted-head' | 'non-git'
   proposed_acks?: string[]
@@ -89,6 +90,7 @@ export class JobStore {
       opts.min_completed_channels ?? DEFAULT_MIN_COMPLETED_CHANNELS
     if (opts.session_id !== undefined) metadata.session_id = opts.session_id
     if (opts.round !== undefined) metadata.round = opts.round
+    if (opts.review_target !== undefined) metadata.review_target = opts.review_target
     if (opts.review_controls !== undefined) metadata.review_controls = opts.review_controls
     if (opts.trust_mode !== undefined) metadata.trust_mode = opts.trust_mode
     if (opts.proposed_acks !== undefined) metadata.proposed_acks = opts.proposed_acks

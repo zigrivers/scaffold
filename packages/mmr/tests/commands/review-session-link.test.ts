@@ -2,13 +2,18 @@ import { afterEach, describe, it, expect, vi } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { execFileSync } from 'node:child_process'
 import { restoreEnv } from '../helpers/env.js'
 const originalHome = process.env.HOME
 const originalMmrHome = process.env.MMR_HOME
+const originalPath = process.env.PATH
+const originalExitCode = process.exitCode
 
 afterEach(() => {
   restoreEnv('HOME', originalHome)
   restoreEnv('MMR_HOME', originalMmrHome)
+  restoreEnv('PATH', originalPath)
+  process.exitCode = originalExitCode
   vi.restoreAllMocks()
 })
 
@@ -135,6 +140,21 @@ describe('review - auto-link to session', () => {
       } as never)
       expect(dispatchSpy).not.toHaveBeenCalled()
       expect(errors.join('\n')).toMatch(/exact review target already dispatched/i)
+      expect(process.exitCode).toBe(1)
+
+      process.exitCode = undefined
+      await reviewCommand.handler({
+        diff: diffPath,
+        channels: ['local'],
+        session: 'feat-foo',
+        round: 2,
+        'dry-run': true,
+        trustProjectConfig: true,
+        _: ['review'],
+        $0: 'mmr',
+      } as never)
+      expect(dispatchSpy).not.toHaveBeenCalled()
+      expect(process.exitCode).toBeUndefined()
 
       fs.writeFileSync(path.join(store.getJobDir(prior.job_id), 'results.json'), JSON.stringify({
         verdict: 'needs-user-decision',
@@ -182,6 +202,92 @@ describe('review - auto-link to session', () => {
       } as never)
       expect(dispatchSpy).toHaveBeenCalledOnce()
     } finally {
+      vi.doUnmock('../../src/core/dispatcher.js')
+      vi.doUnmock('../../src/core/auth.js')
+      fs.rmSync(tmpHome, { recursive: true, force: true })
+    }
+  })
+
+  it('allows the same patch on a new exact PR head', async () => {
+    vi.resetModules()
+    const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-link-head-'))
+    const binDir = path.join(tmpHome, 'bin')
+    fs.mkdirSync(binDir)
+    fs.writeFileSync(path.join(tmpHome, '.mmr.yaml'), [
+      'version: 1',
+      'channels:',
+      '  local:',
+      '    command: local-review',
+      '    auth:',
+      '      check: "true"',
+      '      failure_exit_codes: [1]',
+      '      recovery: "x"',
+    ].join('\n'))
+    const diff = [
+      'diff --git a/x.ts b/x.ts',
+      '--- a/x.ts',
+      '+++ b/x.ts',
+      '@@ -1,1 +1,2 @@',
+      ' export const foo = 1',
+      '+export const bar = 2',
+      '',
+    ].join('\n')
+    const fakeGh = path.join(binDir, 'gh')
+    fs.writeFileSync(fakeGh, `#!/bin/sh
+case "$*" in
+  "pr diff 7") printf '%s' "$MMR_TEST_DIFF" ;;
+  "pr view 7 --json baseRefName") printf '%s\\n' '{"baseRefName":"main"}' ;;
+  "pr view 7 --json url,headRefOid") printf '%s\\n' '{"url":"https://github.com/acme/app/pull/7","headRefOid":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}' ;;
+  *) exit 1 ;;
+esac
+`)
+    fs.chmodSync(fakeGh, 0o755)
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: tmpHome })
+    execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: tmpHome })
+    execFileSync('git', ['config', 'user.name', 'Test'], { cwd: tmpHome })
+    execFileSync('git', ['add', '.mmr.yaml'], { cwd: tmpHome })
+    execFileSync('git', ['commit', '-qm', 'base'], { cwd: tmpHome })
+    process.env.HOME = tmpHome
+    delete process.env.MMR_HOME
+    process.env.PATH = `${binDir}:${originalPath ?? ''}`
+    process.env.MMR_TEST_DIFF = diff
+
+    const { JobStore } = await import('../../src/core/job-store.js')
+    const { SessionStore } = await import('../../src/commands/sessions.js')
+    const store = new JobStore(path.join(tmpHome, '.mmr', 'jobs'))
+    const prior = store.createJob({
+      fix_threshold: 'P2',
+      format: 'json',
+      channels: ['local'],
+      session_id: 'pr-app-7-cycle-1',
+      round: 1,
+      review_target: 'https://github.com/acme/app/pull/7@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    })
+    store.saveDiff(prior.job_id, diff)
+    SessionStore.fromHome(tmpHome).addJob('pr-app-7-cycle-1', prior.job_id, 1)
+
+    const dispatchSpy = vi.fn().mockResolvedValue(undefined)
+    vi.doMock('../../src/core/dispatcher.js', () => ({ dispatchChannel: dispatchSpy }))
+    vi.doMock('../../src/core/auth.js', () => ({
+      checkInstalled: vi.fn().mockResolvedValue(true),
+      checkAuth: vi.fn().mockResolvedValue({ status: 'ok' }),
+    }))
+    const { reviewCommand } = await import('../../src/commands/review.js')
+    vi.spyOn(process, 'cwd').mockReturnValue(tmpHome)
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    try {
+      await reviewCommand.handler({
+        pr: 7,
+        channels: ['local'],
+        session: 'pr-app-7-cycle-2',
+        round: 1,
+        trustProjectConfig: true,
+        _: ['review'],
+        $0: 'mmr',
+      } as never)
+      expect(dispatchSpy).toHaveBeenCalledOnce()
+    } finally {
+      delete process.env.MMR_TEST_DIFF
       vi.doUnmock('../../src/core/dispatcher.js')
       vi.doUnmock('../../src/core/auth.js')
       fs.rmSync(tmpHome, { recursive: true, force: true })

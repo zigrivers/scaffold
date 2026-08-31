@@ -134,8 +134,9 @@ If a channel reports an auth failure, follow the recovery line in the output
 
 ## Common workflows
 
-**After creating a PR** — run `mmr review --pr <number>`, note the job id, keep
-working, poll `mmr status <job-id>` until channels complete, collect with
+**After creating a PR** — run `mmr review --pr <number> --session
+pr-<repo-id>-<number>-cycle-<cycle> --round <round> --max-rounds 3`, note the
+job id, keep working, poll `mmr status <job-id>` until channels complete, collect with
 `mmr results <job-id>`, then fix findings at or above the threshold (or merge if
 the gate passed).
 

@@ -34,6 +34,11 @@ ROOT="$BATS_TEST_DIRNAME/.."
   grep -q -- "--max-rounds 3" "$ROOT/content/tools/review-pr.md"
 }
 
+@test "generated direct PR review guidance carries native cycle bounds" {
+  F="$ROOT/content/pipeline/environment/automated-pr-review.md"
+  grep -Eq -- 'mmr review --pr <N>.*--session.*--round.*--max-rounds 3.*--sync' "$F"
+}
+
 @test "review-pr.md resets round one in a fresh bounded remediation cycle" {
   F="$ROOT/content/tools/review-pr.md"
   grep -q 'Set CYCLE and ROUND from the verified review history' "$F"

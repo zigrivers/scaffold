@@ -7,6 +7,10 @@
 - The pre-dispatch config/ack trust gate now exits 3
   (`needs-user-decision`) instead of 2 (`blocked`), matching the verdict and
   the documented exit-code contract.
+- Session jobs now persist a PR URL plus exact head object ID. Duplicate
+  suppression still blocks a repeated exact head, but no longer mistakes an
+  unchanged patch on a rebased head for an already-reviewed target. Dry runs
+  remain non-dispatching previews and do not consume duplicate-target state.
 
 ### Removed
 

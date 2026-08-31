@@ -100,8 +100,9 @@ mark which parts are queue-only.
   `gh pr merge` directly — blocked by the mq-guard hook); otherwise
   serialize a merge-slot `gh pr merge --squash --delete-branch` —,
   (8) sync main via `make main-sync && make
-  prune-merged` — with step 5.5 = `mmr review --pr <N> --sync
-  --format json` between creating the PR and the gate/enqueue steps,
+  prune-merged` — with step 5.5 = `mmr review --pr <N> --session
+  pr-<repo-id>-<N>-cycle-<C> --round <R> --max-rounds 3 --sync --format
+  json` between creating the PR and the gate/enqueue steps,
   including autonomous bounded remediation when round three exposes a verified
   in-scope or required-safeguard blocker
 - (deep) `scripts/setup-agent-worktree.sh` is confirmed present via
@@ -365,7 +366,8 @@ Depth-gate per Methodology Scaling above.
    diff against the coding standards; the gate itself is step 6's
    `make check-affected`, not a full run here) -> (3) rebase -> (4) push ->
    (5) `gh pr create` (auto-applies `.github/pull_request_template.md`) ->
-   **step 5.5: `mmr review --pr <N> --sync --format json`** (mandatory;
+   **step 5.5: `mmr review --pr <N> --session pr-<repo-id>-<N>-cycle-<C>
+   --round <R> --max-rounds 3 --sync --format json`** (mandatory;
    group duplicate findings by root cause and give each one a finite
    disposition. The original bead and its acceptance criteria bound the PR's
    required scope. Severity alone never creates a bead. A follow-up must be
@@ -467,7 +469,7 @@ is detected on the `gh pr create` trigger string):
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '.tool_input.command // empty' | grep -q 'gh pr create' && echo 'MANDATORY: run mmr review --pr <PR#> --sync --format json before moving on (maximum 3 rounds per bounded cycle; after a concrete repair, review the new exact head from round 1; see docs/git-workflow.md).' || true"
+            "command": "jq -r '.tool_input.command // empty' | grep -q 'gh pr create' && echo 'MANDATORY: run mmr review --pr <PR#> --session pr-<repo-id>-<PR#>-cycle-<C> --round <R> --max-rounds 3 --sync --format json before moving on (maximum 3 rounds per bounded cycle; after a concrete repair, review the new exact head from round 1; see docs/git-workflow.md).' || true"
           }
         ]
       }

@@ -189,7 +189,7 @@ order:
       commands — a plain invocation installs nothing); draft PR on the first
       push — the draft is the visible claim.
    5. Verify: `make check` green on branch HEAD, personally watched.
-   6. Review + enqueue: `mmr review --pr <N> --sync --format json` (at most
+   6. Review + enqueue: `mmr review --pr <N> --session pr-<repo-id>-<N>-cycle-<C> --round <R> --max-rounds 3 --sync --format json` (at most
       three rounds per bounded cycle; after a concrete repair and focused
       regression proof, a round-three in-scope blocker restarts at round one on
       the same PR), then `make mq-enqueue PR=<N>` only when the final exact head

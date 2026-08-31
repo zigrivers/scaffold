@@ -29,7 +29,8 @@ export const SETTINGS_PATH = '.claude/settings.json'
 export const REVIEW_REMINDER_COMMAND = [
   'jq -r \'.tool_input.command // empty\'',
   '| grep -q \'gh pr create\'',
-  '&& echo \'MANDATORY: run mmr review --pr <PR#> --sync --format json before moving on',
+  '&& echo \'MANDATORY: run mmr review --pr <PR#> --session pr-<repo-id>-<PR#>-cycle-<C>',
+  '--round <R> --max-rounds 3 --sync --format json before moving on',
   '(maximum 3 rounds per bounded cycle; after a concrete repair,',
   'review the new exact head from round 1; see docs/git-workflow.md).\'',
   '|| true',

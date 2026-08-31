@@ -16,6 +16,10 @@ All notable changes to Scaffold are documented here.
   review-job-only disposition instead of a persistent cross-project
   acknowledgment. A config/ack trust-gate stop now returns exit 3
   (`needs-user-decision`) instead of exit 2 (`blocked`), matching its verdict.
+  PR jobs persist the PR URL and exact head object ID, so an unchanged patch on
+  a rebased head can receive its required review while a repeated exact head is
+  still rejected. Generated direct-review guidance now always supplies the
+  session, round, and three-round bound explicitly.
 
 ## [3.54.1] - 2026-08-30
 
