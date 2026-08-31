@@ -23,6 +23,11 @@ All notable changes to Scaffold are documented here.
   still rejected. Generated direct-review guidance now always supplies the
   session, round, and three-round bound explicitly.
 
+### Fixed
+
+- **`mmr --version` reports the MMR package version** instead of inheriting the
+  hosting workspace's version from yargs' ESM package detection.
+
 ## [3.54.1] - 2026-08-30
 
 Bounded review-follow-up release. Multi-model review remains mandatory, but
