@@ -1,4 +1,5 @@
 import yargs from 'yargs'
+import fs from 'node:fs'
 import { reviewCommand } from './commands/review.js'
 import { statusCommand } from './commands/status.js'
 import { resultsCommand } from './commands/results.js'
@@ -22,6 +23,15 @@ export const REGISTERED_TOP_LEVEL = [
   'reconcile', 'sessions', 'ack', 'skill', 'commands', 'explain',
 ] as const
 
+function readPackageVersion(): string {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version?: string }
+    return pkg.version ?? 'unknown'
+  } catch {
+    return 'unknown'
+  }
+}
+
 export async function runCli(argv: string[]): Promise<void> {
   await yargs(argv)
     .scriptName('mmr')
@@ -42,5 +52,6 @@ export async function runCli(argv: string[]): Promise<void> {
     .demandCommand(1, 'Run mmr --help for usage')
     .strict()
     .help()
+    .version(readPackageVersion())
     .argv
 }

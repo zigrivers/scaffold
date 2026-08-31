@@ -1,6 +1,6 @@
 {
   "name": "@zigrivers/mmr",
-  "version": "4.0.1",
+  "version": "4.0.2",
   "description": "Multi-model code review CLI — async dispatch, reconciliation, and severity gating",
   "type": "module",
   "license": "MIT",
@@ -29,7 +29,9 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "pretest": "npm run build",
     "test": "vitest run",
+    "pretest:coverage": "npm run build",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src/ scripts/",
     "type-check": "tsc -p tsconfig.check.json",

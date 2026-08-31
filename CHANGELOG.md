@@ -4,6 +4,8 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.54.2] - 2026-08-31
+
 ### Changed
 
 - **In-scope review remediation is now autonomous.** MMR remains capped at
@@ -20,6 +22,11 @@ All notable changes to Scaffold are documented here.
   a rebased head can receive its required review while a repeated exact head is
   still rejected. Generated direct-review guidance now always supplies the
   session, round, and three-round bound explicitly.
+
+### Fixed
+
+- **`mmr --version` reports the MMR package version** instead of inheriting the
+  hosting workspace's version from yargs' ESM package detection.
 
 ## [3.54.1] - 2026-08-30
 
