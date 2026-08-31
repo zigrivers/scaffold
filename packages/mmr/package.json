@@ -31,6 +31,7 @@
     "build": "tsc -p tsconfig.build.json",
     "pretest": "npm run build",
     "test": "vitest run",
+    "pretest:coverage": "npm run build",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src/ scripts/",
     "type-check": "tsc -p tsconfig.check.json",
