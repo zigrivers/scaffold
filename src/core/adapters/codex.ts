@@ -172,7 +172,10 @@ fi
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 [ "$BRANCH" = "HEAD" ] && BRANCH="detached-$(git rev-parse --short HEAD 2>/dev/null)"
 ${CODEX_REPO_ID_SETUP}
-SESSION_ID="local-full-$REPO_ID-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
+BRANCH_SLUG=$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')
+BRANCH_HASH=$(printf '%s' "$BRANCH" | git hash-object --stdin | cut -c1-12)
+BRANCH_ID="$BRANCH_SLUG-$BRANCH_HASH"
+SESSION_ID="local-full-$REPO_ID-$BRANCH_ID"
 ${CODEX_RESUME_SETUP}
 resolve_mmr_position "$SESSION_ID-cycle-" || exit 1
 MMR_FLAGS=(--session "$SESSION_ID-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json)
@@ -188,7 +191,10 @@ git diff "$MERGE_BASE" | mmr review --diff - "\${MMR_FLAGS[@]}"
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 [ "$BRANCH" = "HEAD" ] && BRANCH="detached-$(git rev-parse --short HEAD 2>/dev/null)"
 ${CODEX_REPO_ID_SETUP}
-SESSION_ID="local-staged-$REPO_ID-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
+BRANCH_SLUG=$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')
+BRANCH_HASH=$(printf '%s' "$BRANCH" | git hash-object --stdin | cut -c1-12)
+BRANCH_ID="$BRANCH_SLUG-$BRANCH_HASH"
+SESSION_ID="local-staged-$REPO_ID-$BRANCH_ID"
 ${CODEX_RESUME_SETUP}
 resolve_mmr_position "$SESSION_ID-cycle-" || exit 1
 mmr review --staged --session "$SESSION_ID-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json
@@ -202,7 +208,10 @@ BRANCH_NAME="<branch-name>"
 BASE_REF=main
 BASE_ID=$(printf '%s' "$BASE_REF" | git hash-object --stdin | cut -c1-12)
 ${CODEX_REPO_ID_SETUP}
-SESSION_ID="local-range-$BASE_ID-$REPO_ID-$(printf '%s' "$BRANCH_NAME" | tr -c 'a-zA-Z0-9_-' '-')"
+BRANCH_SLUG=$(printf '%s' "$BRANCH_NAME" | tr -c 'a-zA-Z0-9_-' '-')
+BRANCH_HASH=$(printf '%s' "$BRANCH_NAME" | git hash-object --stdin | cut -c1-12)
+BRANCH_ID="$BRANCH_SLUG-$BRANCH_HASH"
+SESSION_ID="local-range-$BASE_ID-$REPO_ID-$BRANCH_ID"
 ${CODEX_RESUME_SETUP}
 resolve_mmr_position "$SESSION_ID-cycle-" || exit 1
 mmr review --base "$BASE_REF" --head "$BRANCH_NAME" --session "$SESSION_ID-cycle-$CYCLE" \
@@ -289,13 +298,33 @@ if (record.rounds !== Number(process.argv[1]) || record.jobs?.at(-1) !== process
     echo "PR ledger and MMR session history disagree; reconcile them before review." >&2; exit 1
   }
 fi
-mmr review --pr "$PR_NUMBER" --session "$SESSION_ID-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json
+MMR_EXIT=0
+MMR_RESULT=$(mmr review --pr "$PR_NUMBER" --session "$SESSION_ID-cycle-$CYCLE" \
+  --round "$ROUND" --max-rounds 3 --sync --format json) || MMR_EXIT=$?
+echo "$MMR_RESULT"
+[ "$MMR_EXIT" -eq 1 ] && exit 1
+REVIEW_TARGET=$(printf '%s' "$MMR_RESULT" | node -e '
+const result = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+const exactTarget = typeof result.review_target === "string"
+  && /@(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(result.review_target);
+if (!exactTarget) process.exit(1);
+process.stdout.write(result.review_target);
+') || { echo "MMR did not return a valid exact review_target." >&2; exit 1; }
+REVIEWED_HEAD=\${REVIEW_TARGET##*@}
+CURRENT_HEAD="$REVIEWED_HEAD"
+LATEST_HEAD=$(gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid) || exit 1
+if [ "$LATEST_HEAD" != "$CURRENT_HEAD" ]; then
+  echo "PR head changed after review; disposition this result, then review the new exact head before merge." >&2
+  exit 1
+fi
 \`\`\`
 
 After every completed call, classify and disposition every semantic finding,
 then use \`gh pr comment\` to post one evidence summary whose final line is:
 \`<!-- mmr-cycle-ledger cycle=<C> round=<R> head=<SHA> job=<ID> verdict=<V> next_cycle=<C> next_round=<R> -->\`.
 Only that authenticated review actor's markers are trusted on resume.
+Use the returned \`review_target\` for the marker, and re-read the PR head before
+merge. A changed head must complete its own bounded review.
 
 Append \`--fix-threshold P0|P1|P2|P3\` to override the project's configured
 threshold for this invocation.

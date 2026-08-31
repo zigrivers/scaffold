@@ -204,6 +204,17 @@ ROOT="$BATS_TEST_DIRNAME/.."
   grep -q 'REVIEW_SCOPE="range"' "$F"
   grep -q 'REVIEW_SCOPE="full"' "$F"
   grep -q 'SESSION_ID="local-$SCOPE_ID-' "$F"
+  grep -q 'BRANCH_HASH=.*git hash-object --stdin' "$F"
+  grep -q '\$BRANCH_ID' "$F"
+}
+
+@test "shipped MMR quick references require job-scoped evidence" {
+  for F in \
+    "$ROOT/content/agent-skills/mmr/SKILL.md" \
+    "$ROOT/content/skills/mmr/SKILL.md" \
+    "$ROOT/packages/mmr/templates/skills/opencode/mmr.md"; do
+    grep -q 'ack add <finding-key> --job <id> --scope job --reason' "$F"
+  done
 }
 
 @test "lean work-beads variants retain the autonomous restart safeguards" {
@@ -245,6 +256,9 @@ ROOT="$BATS_TEST_DIRNAME/.."
   grep -q -- '--paginate' "$F"
   grep -q 'gh pr comment' "$F"
   grep -q 'final line' "$F"
+  grep -q 'review_target' "$F"
+  grep -q 'REVIEWED_HEAD' "$F"
+  grep -q 'head changed after review' "$F"
 }
 
 @test "review-pr accepts SHA-1 and SHA-256 exact heads" {

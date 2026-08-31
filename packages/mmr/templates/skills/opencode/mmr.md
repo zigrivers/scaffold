@@ -156,7 +156,7 @@ targets the wrappers don't cover (docs, arbitrary diffs, ref ranges).
 mmr jobs list                          # recent review/critique jobs (also: prune)
 mmr status <job-id>                    # one job's per-channel progress
 mmr results <job-id> --format json     # reconciled findings (also text | markdown)
-mmr ack add <finding-key> --job <id>   # acknowledge a finding (also: list, rm, prune)
+mmr ack add <finding-key> --job <id> --scope job --reason "reject: <evidence>"
 mmr reconcile <job-id> --channel superpowers --input findings.json
 mmr sessions list                      # iterative sessions (also: start | show | end)
 ```

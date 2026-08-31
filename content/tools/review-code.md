@@ -88,6 +88,9 @@ state root; use cycle one only when no prior review exists for the target.
 # "HEAD") fall back to the short commit so distinct reviews don't collide.
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 [ "$BRANCH" = "HEAD" ] && BRANCH="detached-$(git rev-parse --short HEAD 2>/dev/null)"
+BRANCH_SLUG=$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')
+BRANCH_HASH=$(printf '%s' "$BRANCH" | git hash-object --stdin | cut -c1-12)
+BRANCH_ID="$BRANCH_SLUG-$BRANCH_HASH"
 STAGED_ONLY=false; [[ "$ARGUMENTS" == *--staged* ]] && STAGED_ONLY=true
 if [ "$STAGED_ONLY" = true ]; then REVIEW_SCOPE="staged"
 elif [ -n "$BASE_REF" ]; then REVIEW_SCOPE="range"
@@ -102,7 +105,7 @@ if [ "$REVIEW_SCOPE" = "range" ]; then
   BASE_ID=$(printf '%s' "$BASE_REF" | git hash-object --stdin | cut -c1-12)
   SCOPE_ID="range-$BASE_ID"
 fi
-SESSION_ID="local-$SCOPE_ID-$REPO_ID-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
+SESSION_ID="local-$SCOPE_ID-$REPO_ID-$BRANCH_ID"
 # On resume, run `mmr sessions list`, select the highest numeric cycle for the
 # exact `$SESSION_ID-cycle-` prefix, and confirm it with
 # `mmr sessions show "$SESSION_ID-cycle-$CYCLE"`.

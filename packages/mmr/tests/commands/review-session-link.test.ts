@@ -237,7 +237,17 @@ describe('review - auto-link to session', () => {
 case "$*" in
   "pr diff 7") printf '%s' "$MMR_TEST_DIFF" ;;
   "pr view 7 --json baseRefName") printf '%s\\n' '{"baseRefName":"main"}' ;;
-  "pr view 7 --json url,headRefOid") printf '%s\\n' '{"url":"https://github.com/acme/app/pull/7","headRefOid":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}' ;;
+  "pr view 7 --json url,headRefOid")
+    count=0
+    [ -f "$MMR_TEST_HEAD_COUNT" ] && count=$(sed -n '1p' "$MMR_TEST_HEAD_COUNT")
+    count=$((count + 1))
+    printf '%s\\n' "$count" > "$MMR_TEST_HEAD_COUNT"
+    if [ "$MMR_TEST_HEAD_CHANGE" = "1" ] && [ "$count" -gt 1 ]; then
+      printf '%s\\n' '{"url":"https://github.com/acme/app/pull/7","headRefOid":"cccccccccccccccccccccccccccccccccccccccc"}'
+    else
+      printf '%s\\n' '{"url":"https://github.com/acme/app/pull/7","headRefOid":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}'
+    fi
+    ;;
   *) exit 1 ;;
 esac
 `)
@@ -251,6 +261,7 @@ esac
     delete process.env.MMR_HOME
     process.env.PATH = `${binDir}:${originalPath ?? ''}`
     process.env.MMR_TEST_DIFF = diff
+    process.env.MMR_TEST_HEAD_COUNT = path.join(tmpHome, 'head-count')
 
     const { JobStore } = await import('../../src/core/job-store.js')
     const { SessionStore } = await import('../../src/commands/sessions.js')
@@ -275,6 +286,8 @@ esac
     const { reviewCommand } = await import('../../src/commands/review.js')
     vi.spyOn(process, 'cwd').mockReturnValue(tmpHome)
     vi.spyOn(console, 'log').mockImplementation(() => {})
+    const errors: string[] = []
+    vi.spyOn(console, 'error').mockImplementation((message?: unknown) => { errors.push(String(message)) })
     try {
       await reviewCommand.handler({
         pr: 7,
@@ -286,8 +299,26 @@ esac
         $0: 'mmr',
       } as never)
       expect(dispatchSpy).toHaveBeenCalledOnce()
+
+      fs.rmSync(process.env.MMR_TEST_HEAD_COUNT, { force: true })
+      process.env.MMR_TEST_HEAD_CHANGE = '1'
+      process.exitCode = undefined
+      await reviewCommand.handler({
+        pr: 7,
+        channels: ['local'],
+        session: 'pr-app-7-cycle-3',
+        round: 1,
+        trustProjectConfig: true,
+        _: ['review'],
+        $0: 'mmr',
+      } as never)
+      expect(dispatchSpy).toHaveBeenCalledOnce()
+      expect(errors.join('\n')).toMatch(/head changed while its diff was being captured/i)
+      expect(process.exitCode).toBe(1)
     } finally {
       delete process.env.MMR_TEST_DIFF
+      delete process.env.MMR_TEST_HEAD_COUNT
+      delete process.env.MMR_TEST_HEAD_CHANGE
       vi.doUnmock('../../src/core/dispatcher.js')
       vi.doUnmock('../../src/core/auth.js')
       fs.rmSync(tmpHome, { recursive: true, force: true })

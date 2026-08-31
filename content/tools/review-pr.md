@@ -117,7 +117,15 @@ MMR_FLAGS=(--pr "$PR_NUMBER" --session "$SESSION_ID-cycle-$CYCLE" --round "$ROUN
 MMR_EXIT=0
 MMR_RESULT=$(mmr review "${MMR_FLAGS[@]}") || MMR_EXIT=$?
 echo "$MMR_RESULT"
+[ "$MMR_EXIT" -eq 1 ] && exit 1
 JOB_ID=$(echo "$MMR_RESULT" | grep -o '"job_id": "[^"]*"' | head -1 | cut -d'"' -f4)
+REVIEW_TARGET=$(printf '%s' "$MMR_RESULT" | node -e '
+const result = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+if (typeof result.review_target !== "string" || !/@(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(result.review_target)) process.exit(1);
+process.stdout.write(result.review_target);
+') || { echo "MMR did not return a valid exact review_target." >&2; exit 1; }
+REVIEWED_HEAD=${REVIEW_TARGET##*@}
+CURRENT_HEAD="$REVIEWED_HEAD"
 ```
 
 Never invoke round 4. At the third-round result, apply the bounded remediation
@@ -198,13 +206,18 @@ channel auth failures with the recovery command MMR prints.
 After disposition, post the evidence summary and marker explicitly:
 
 ```bash
+LATEST_HEAD=$(gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid) || exit 1
+if [ "$LATEST_HEAD" != "$CURRENT_HEAD" ]; then
+  echo "PR head changed after review; record this reviewed head, then review the new exact head before merge." >&2
+fi
 gh pr comment "$PR_NUMBER" --body "<evidence summary>
 
 <!-- mmr-cycle-ledger cycle=$CYCLE round=$ROUND head=$CURRENT_HEAD job=$JOB_ID verdict=<verdict> next_cycle=<C> next_round=<R> -->"
 ```
 
 The marker must be the final line, and its next position must match the verified
-MMR session history.
+MMR session history. If the head changed after review, do not merge; start the
+next bounded round on the new head after recording this round's dispositions.
 
 ### Step 5: Report
 

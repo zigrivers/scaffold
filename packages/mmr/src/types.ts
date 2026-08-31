@@ -136,6 +136,8 @@ export interface ChannelJobEntry {
 
 export interface ReconciledResults {
   job_id: string
+  /** Exact target whose diff produced this result. */
+  review_target?: string
   verdict: Verdict
   fix_threshold: Severity
   advisory_count: number

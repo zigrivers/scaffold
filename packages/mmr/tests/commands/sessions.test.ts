@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { spawn } from 'node:child_process'
 import { SessionStore } from '../../src/commands/sessions.js'
 
 let tmpHome: string
@@ -111,6 +112,26 @@ describe('SessionStore', () => {
     const s = store.show('feat-foo')!
     expect(s.jobs).toEqual(['mmr-abc123'])
     expect(fs.existsSync(staleLock)).toBe(false)
+  })
+
+  it('serializes reservations across sessions in the same cycle family', async () => {
+    const lockPath = path.join(tmpHome, '.mmr', 'sessions', 'feat-cycle-.family.lock')
+    fs.mkdirSync(path.dirname(lockPath), { recursive: true })
+    const child = spawn(process.execPath, ['-e', `
+const fs = require('node:fs')
+const lockPath = process.argv[1]
+fs.mkdirSync(lockPath, { recursive: false })
+process.stdout.write('ready\\n')
+setTimeout(() => fs.rmSync(lockPath, { recursive: true, force: true }), 300)
+`, lockPath], { stdio: ['ignore', 'pipe', 'inherit'] })
+    await new Promise<void>((resolve, reject) => {
+      child.once('error', reject)
+      child.stdout.once('data', () => resolve())
+    })
+
+    const startedAt = Date.now()
+    store.withFamilyLock('feat-cycle-2', () => undefined)
+    expect(Date.now() - startedAt).toBeGreaterThanOrEqual(150)
   })
 
   it('list() reads the session index instead of parsing every session file', () => {

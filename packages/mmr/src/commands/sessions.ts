@@ -147,6 +147,12 @@ export class SessionStore {
     })
   }
 
+  withFamilyLock<T>(id: string, fn: () => T): T {
+    this.validateId(id)
+    const family = id.replace(/-cycle-[1-9][0-9]*$/, '-cycle-')
+    return this.withLock(path.join(this.dir, `${family}.family`), fn)
+  }
+
   start(id: string): SessionRecord {
     this.validateId(id)
     fs.mkdirSync(this.dir, { recursive: true })

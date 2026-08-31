@@ -183,6 +183,10 @@ describe('CodexAdapter', () => {
       expect(content).toContain('SESSION_ID="local-full-')
       expect(content).toContain('SESSION_ID="local-staged-')
       expect(content).toContain('SESSION_ID="local-range-')
+      expect(content.match(/BRANCH_HASH=.*git hash-object --stdin/g)).toHaveLength(3)
+      expect(content).toContain('local-full-$REPO_ID-$BRANCH_ID')
+      expect(content).toContain('local-staged-$REPO_ID-$BRANCH_ID')
+      expect(content).toContain('local-range-$BASE_ID-$REPO_ID-$BRANCH_ID')
       expect(content).toContain('REPO_ID=$(')
       expect(content).toContain('local-full-$REPO_ID-')
       expect(content).toContain('BASE_ID=')
@@ -245,6 +249,9 @@ describe('CodexAdapter', () => {
       expect(content).toContain('gh pr comment')
       expect(content).toContain('[0-9a-f]{40,64}')
       expect(content).toContain('--round "$ROUND" --max-rounds 3')
+      expect(content).toContain('REVIEW_TARGET=')
+      expect(content).toContain('review_target')
+      expect(content).toContain('REVIEWED_HEAD=')
       expect(content).toContain('mmr sessions list')
       expect(content).toContain('mmr sessions show')
       expect(content).toMatch(/latest cycle reached round 3/i)
@@ -269,7 +276,9 @@ mmr() {
     printf '%s' "$MMR_SESSIONS" | sed "s/__REPO_ID__/$REPO_ID/g"
     [ "$MMR_LIST_FAIL" != "true" ]
   elif [ "$1 $2" = "sessions show" ]; then printf '%s' "$MMR_SESSION" | sed "s/__REPO_ID__/$REPO_ID/g"
-  elif [ "$1" = "review" ]; then printf 'REVIEW %s\\n' "$*"
+  elif [ "$1" = "review" ]; then
+    printf '{"job_id":"mmr-test","review_target":"https://x/pr/42@%s",' "$CURRENT_HEAD"
+    printf '"command":"REVIEW %s"}\\n' "$*"
   else return 1
   fi
 }
@@ -426,9 +435,9 @@ ${recipe}
       const script = `
 mmr() {
   if [ "$1 $2" = "sessions list" ]; then
-    printf '%s' "$MMR_SESSIONS" | sed "s/__REPO_ID__/$REPO_ID/g"
+    printf '%s' "$MMR_SESSIONS" | sed "s/__REPO_ID__/$REPO_ID/g; s/__BRANCH_ID__/$BRANCH_ID/g"
   elif [ "$1 $2" = "sessions show" ]; then
-    printf '%s' "$MMR_SESSION" | sed "s/__REPO_ID__/$REPO_ID/g"
+    printf '%s' "$MMR_SESSION" | sed "s/__REPO_ID__/$REPO_ID/g; s/__BRANCH_ID__/$BRANCH_ID/g"
   elif [ "$1" = "results" ]; then
     printf '%s' '{"verdict":"needs-user-decision"}'
     return 3
@@ -444,12 +453,12 @@ ${modeTwo}
         env: {
           ...process.env,
           MMR_SESSIONS: JSON.stringify([{
-            session_id: 'local-staged-__REPO_ID__-fix-autonomous-review-cycles-cycle-1',
+            session_id: 'local-staged-__REPO_ID__-__BRANCH_ID__-cycle-1',
             rounds: 1,
             jobs: ['mmr-prior'],
           }]),
           MMR_SESSION: JSON.stringify({
-            session_id: 'local-staged-__REPO_ID__-fix-autonomous-review-cycles-cycle-1',
+            session_id: 'local-staged-__REPO_ID__-__BRANCH_ID__-cycle-1',
             rounds: 1,
             jobs: ['mmr-prior'],
           }),
