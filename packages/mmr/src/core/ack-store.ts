@@ -24,7 +24,7 @@ export interface AckRecord {
   created_at: string
 }
 
-export type AckScope = 'project' | 'user'
+export type AckScope = 'project' | 'user' | 'job'
 
 export interface AckMatch {
   record: AckRecord
@@ -47,6 +47,8 @@ export interface AckStoreOptions {
    * ~/.mmr), so user acks live beside jobs/ and sessions/ and honor MMR_HOME.
    */
   userRoot: string
+  /** One review job whose private `acks` directory stores exact-only dispositions. */
+  jobRoot?: string
   /**
    * When set, project-scope ack reads come from this Git ref via `git show`
    * (committed blobs) instead of the working tree — the §5-decision-1 trust
@@ -57,7 +59,8 @@ export interface AckStoreOptions {
 }
 
 /**
- * Build an AckStore for a review run. User-scope acks (`<userRoot>/acks`,
+ * Build an AckStore for a review run. Job-scope dispositions are exact-only
+ * and private to one immutable review job. User-scope acks (`<userRoot>/acks`,
  * userRoot = resolveSessionRoot(), MMR_HOME-aware) are always loaded — they
  * live on the operator's own machine. Project-scope acks live in the reviewed
  * tree, which may be untrusted (a PR checkout in CI), so they are loaded only
@@ -74,6 +77,7 @@ export interface AckStoreOptions {
 export function buildReviewAckStore(opts: {
   trustProjectAcks: boolean
   userRoot: string
+  jobRoot?: string
   cwd?: string
   configBaseRef?: string
 }): AckStore {
@@ -85,6 +89,7 @@ export function buildReviewAckStore(opts: {
   return new AckStore({
     projectRoot: useProject ? findProjectRoot(opts.cwd) : undefined,
     userRoot: opts.userRoot,
+    jobRoot: opts.jobRoot,
     configBaseRef: useBaseRef ? opts.configBaseRef : undefined,
   })
 }
@@ -118,8 +123,10 @@ interface LoadedScope {
 export class AckStore {
   private readonly projectDir: string | undefined
   private readonly userDir: string
+  private readonly jobDir: string | undefined
   private readonly projectRootResolved: string | undefined
   private readonly userRootResolved: string
+  private readonly jobRootResolved: string | undefined
   private readonly configBaseRef: string | undefined
   // Per-instance lazy cache so a review that calls lookup() once per finding
   // reads each acks dir from disk at most once (avoids O(N*M) FS operations).
@@ -128,6 +135,7 @@ export class AckStore {
   constructor(opts: AckStoreOptions) {
     this.projectRootResolved = opts.projectRoot === undefined ? undefined : path.resolve(opts.projectRoot)
     this.userRootResolved = path.resolve(opts.userRoot)
+    this.jobRootResolved = opts.jobRoot === undefined ? undefined : path.resolve(opts.jobRoot)
     // Project acks are repo-committed under <projectRoot>/.mmr/acks. User acks
     // live under the MMR state root at <userRoot>/acks (beside jobs/sessions),
     // so they honor MMR_HOME — no extra `.mmr` segment for the user scope.
@@ -135,6 +143,7 @@ export class AckStore {
       ? undefined
       : path.join(this.projectRootResolved, PROJECT_ACKS_REL)
     this.userDir = path.join(this.userRootResolved, 'acks')
+    this.jobDir = this.jobRootResolved === undefined ? undefined : path.join(this.jobRootResolved, 'acks')
     this.configBaseRef = opts.configBaseRef
   }
 
@@ -153,10 +162,12 @@ export class AckStore {
    * the acks dir and require it to stay within the (realpath'd) root.
    */
   private dirForScope(scope: AckScope): string {
-    const dir = scope === 'project' ? this.projectDir : this.userDir
-    const root = scope === 'project' ? this.projectRootResolved : this.userRootResolved
+    const dir = scope === 'project' ? this.projectDir : scope === 'user' ? this.userDir : this.jobDir
+    const root = scope === 'project'
+      ? this.projectRootResolved
+      : scope === 'user' ? this.userRootResolved : this.jobRootResolved
     if (dir === undefined || root === undefined) {
-      throw new Error('project-scope acks are disabled (no project root configured)')
+      throw new Error(`${scope}-scope acks are disabled (no ${scope} root configured)`)
     }
     // Resolve BOTH the root and the acks dir via their deepest existing
     // ancestor, so the comparison is symlink-consistent even when the root
@@ -335,7 +346,7 @@ export class AckStore {
         records = this.readProjectRecordsFromRef(this.configBaseRef)
       } else {
         // A disabled project scope (no project root) contributes no records.
-        const dir = scope === 'project' ? this.projectDir : this.userDir
+        const dir = scope === 'project' ? this.projectDir : scope === 'user' ? this.userDir : this.jobDir
         records = dir === undefined ? [] : this.readDir(this.dirForScope(scope))
       }
       const byKey = new Map<string, AckRecord>()
@@ -352,24 +363,29 @@ export class AckStore {
     return cached
   }
 
-  /** Merge project and user acks; project shadows user on finding_key conflict. */
+  /** Merge configured scopes; a job disposition is most specific and wins. */
   listAll(): AckRecord[] {
     const byKey = new Map<string, AckRecord>()
     for (const u of this.records('user').records) byKey.set(u.finding_key, u)
     for (const p of this.records('project').records) byKey.set(p.finding_key, p) // project wins
+    for (const j of this.records('job').records) byKey.set(j.finding_key, j) // job wins
     return [...byKey.values()]
   }
 
   /**
    * Lookup an ack matching the given finding identity, applying the two-step
    * rule from T2-D: (1) exact `finding_key` match (O(1) via the per-scope
-   * index); (2) fuzzy fallback only when normalized_location matches AND
+   * index); (2) persistent-scope fuzzy fallback only when location matches AND
    * shingle Jaccard ≥ 0.7. Project scope shadows user scope.
    */
   lookup(finding: { finding_key: string; normalized_location: string; shingle: string[] }): AckMatch | undefined {
+    const job = this.records('job')
     const project = this.records('project')
     const user = this.records('user')
-    // Exact match — project then user so project shadows user.
+    // Job-scoped dispositions are exact-only and affect one immutable job.
+    const exactJob = job.byKey.get(finding.finding_key)
+    if (exactJob) return { record: exactJob, match: 'exact', scope: 'job' }
+    // Persistent exact match — project then user so project shadows user.
     const exactProject = project.byKey.get(finding.finding_key)
     if (exactProject) return { record: exactProject, match: 'exact', scope: 'project' }
     const exactUser = user.byKey.get(finding.finding_key)

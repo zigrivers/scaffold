@@ -50,6 +50,10 @@ describe('installHooks (D8)', () => {
     expect(preCommands).toEqual(['scripts/bd-guard.sh', 'scripts/mq-guard.sh'])
     expect((s.hooks?.PreToolUse ?? []).every(e => e.matcher === 'Bash')).toBe(true)
     expect(s.hooks?.PostToolUse?.[0].hooks[0].command).toBe(REVIEW_REMINDER_COMMAND)
+    expect(REVIEW_REMINDER_COMMAND).toContain('maximum 3 rounds per bounded cycle')
+    expect(REVIEW_REMINDER_COMMAND).toMatch(/--session .*--round .*--max-rounds 3/)
+    expect(REVIEW_REMINDER_COMMAND).toContain('new exact head')
+    expect(REVIEW_REMINDER_COMMAND).not.toContain('owner approval')
   })
   it('is idempotent — the second run changes nothing', () => {
     const root = project({ beads: true, bdGuard: true, mqGuard: true })

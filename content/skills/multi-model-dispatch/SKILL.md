@@ -207,7 +207,14 @@ You are reviewing a pull request diff. Report all P0, P1, P2, and P3 findings; t
 When multiple models produce findings, reconcile them using the rules defined in `multi-model-review-dispatch`. Key principles:
 
 - **Independence rule**: Never share one model's review output with the other. Each model must review the artifact independently to avoid confirmation bias.
-- **Round tracking**: For iterative reviews (like PR review loops), track the round number. After 3 fix rounds with unresolved findings, stop and surface the verdict (`blocked` or `needs-user-decision`) to the user. Do NOT auto-merge.
+- **Round tracking**: Use a maximum of three rounds per review cycle. If round
+  three confirms a reproducible in-scope or required-safeguard blocker, make a
+  concrete repair, add focused regression proof, pass the required gate, then
+  start a new bounded cycle and review the new exact head from round one.
+  Duplicate, stale, hypothetical, speculative, cosmetic, or
+  already-dispositioned findings cannot start a new cycle. Do not merge until a
+  reviewed exact head passes with every finding dispositioned and no verified
+  blocker.
 
 For the full consensus rules, confidence scoring, and disagreement resolution process, see `multi-model-review-dispatch`.
 

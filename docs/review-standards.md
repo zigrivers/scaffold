@@ -31,32 +31,60 @@ Fix every finding at or above the **fix threshold**. The project default is
 `--fix-threshold P0|P1|P2|P3`. `P2` means: fix P0, P1, and P2 findings; P3 is
 advisory.
 
-## Round budget
+## Bounded review cycles
 
-Round-bounding is enforced **natively** by MMR — the meta-prompts pass
-`--session <id> --round <N> --max-rounds 3`, incrementing `--round` each fix
-round. `--round` is required: MMR compares it against `--max-rounds`, so without
-it every call is round 1 and the cap never fires. MMR tracks recurrence with its
-stable
-`finding_key` (normalized location + category + description + suggestion, with
-severity excluded) and stops re-attempting a finding that survives the budget.
-Because description and suggestion are part of the key, a *materially reworded*
-report of the same defect can hash to a new key — so also stop when the same
-underlying defect recurs across rounds even under new wording.
+MMR enforces a **maximum of three rounds per review cycle**. The meta-prompts
+pass `--session <target>-cycle-<C> --round <N> --max-rounds 3`, incrementing
+`--round` after each repair. `--round` is required: without it, every call looks
+like round 1 and the cap never fires. A cycle never dispatches round 4.
+On resume, recover the active cycle and round from the PR disposition ledger and
+MMR session history; use cycle 1 only when neither records a prior review.
 
-- **The `--max-rounds` cap (default 3) is a safety bound, not a quality target.**
-  Each round, fix every real finding at or above the threshold and re-review.
-  Within the cap, keep going while each round surfaces *genuinely different*
-  findings — that is healthy iteration, not a stuck loop.
-- **When the cap is reached, MMR returns `needs-user-decision` — stop and surface
-  to the user** with the remaining findings. That is the escalation point: the
-  user decides whether to fix remaining P0/P1 by hand, file P2/P3 as follow-ups
-  (Beads where the project uses it), raise the budget for more rounds, or accept
-  and proceed. Do not silently loop past the cap.
-  (Filing is manual: the former automatic MMR→Beads bridge was removed in
-  scaffold v3.41.0.)
-- **Also stop early** when the same finding recurs without progress, when
-  channels contradict each other, or when the user asks to stop.
+Every semantic finding receives exactly one finite, evidence-backed
+disposition: `fix-now`, `block`, `reject:<reason>`, or an eligible follow-up.
+Agents reproduce, refute, deduplicate, classify, and disposition findings from
+the code and acceptance criteria. A model's severity label alone never controls
+the decision.
+
+MMR still gates on unacknowledged threshold findings. For a verified refutation,
+duplicate, or stale finding, copy the evidence into the PR disposition ledger,
+then run `mmr ack add <finding-key> --job <job-id> --scope job --reason
+"reject: <evidence>"` and recompute with `mmr results <job-id>`. The finding stays
+visible but no longer blocks that immutable review job. Use `--scope job`, never
+the persistent project or user scopes, for an agent disposition. Never
+acknowledge a verified `fix-now` or `block` item, and never use an acknowledgment
+to hide a required-safeguard defect.
+
+At round three, a reproducible defect within the original acceptance criteria
+or a required safeguard may start a new bounded cycle on the same PR only after
+the agent has made a concrete repair, added or updated focused regression proof,
+and rerun the required gate. Increment the cycle, reset `ROUND` to 1, and review
+the new exact head. The same rule applies to local review targets.
+
+Duplicate, stale, hypothetical, speculative, cosmetic, or already-dispositioned
+findings cannot start a new cycle. Do not run another round merely to obtain a
+cleaner model response. MMR's `finding_key` helps identify recurrence, but the
+agent must also collapse materially reworded reports of the same root cause.
+A reworded recurrence without a materially new, reproducible defect is duplicate
+suggestion churn and cannot restart a cycle.
+
+Continue bounded remediation until every root cause has a disposition and no
+verified fix-now or block item remains. No owner approval is required for
+in-scope remediation. An unresolved required safeguard defect is not a plateau;
+keep repairing it. Stop when the user asks to stop. Otherwise stop only for a
+true external dependency, missing credentials or authority, a destructive
+action, a material product decision outside the acceptance criteria, or a
+demonstrated technical plateau after safe approaches are exhausted. Record exact
+evidence for the stop. Required
+safeguards include security, privacy, and data integrity, plus accessibility and
+every repository or product safeguard named by project instructions.
+
+An unchanged exact target gets at most one same-round retry after
+`needs-user-decision`. If that retry also cannot meet the channel floor, record
+the channel failures and stop on the external dependency or missing credentials.
+Do not start a remediation cycle, change product code, or lower the floor merely
+to retry identical content. A verified blocker still outranks the channel floor
+and follows the repair rule above.
 
 ## Verify, don't dismiss
 
@@ -72,12 +100,14 @@ you do dismiss one, say why in the review summary.
 |---|---|---|---|
 | `pass` | 0 | all channels completed, gate passed | proceed (merge / commit / push) |
 | `degraded-pass` | 0 | gate passed, at least `min_completed_channels` reported, but a channel was skipped or compensated | proceed; note the degradation |
-| `blocked` | 2 | an unresolved finding sits at or above the threshold | **stop** — fix or surface; do not merge |
-| `needs-user-decision` | 3 | no channel completed, **too few channels completed to corroborate**, channels contradict, or human judgment needed | **stop** — surface to the user |
+| `blocked` | 2 | an unresolved finding sits at or above the threshold | fix it in the current cycle; at round three apply the bounded-cycle rule above |
+| `needs-user-decision` | 3 | no channel completed, **too few channels completed to corroborate**, the reviewed diff proposes an untrusted project configuration or persistent acknowledgment change, or an attempted review exceeds the cycle round cap | restore the floor, stop for missing authority until a human ratifies verified persistent trust changes, or apply the bounded-cycle and stopping rules above |
 
 Never merge on `blocked` or `needs-user-decision`. Cross-check each finding's
 `location` against the reviewed diff's file list (`gh pr diff <n> --name-only`
-for PRs); out-of-diff findings are contamination noise.
+for PRs); out-of-diff findings are contamination noise. Merge only when the
+final exact head has completed the configured MMR channel floor, required gates
+are green, every finding is dispositioned, and no verified blocker remains.
 
 ## Completion floor
 

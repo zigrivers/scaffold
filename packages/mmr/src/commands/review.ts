@@ -21,7 +21,14 @@ import {
   resolveCompensatorChannelName,
   resolveCompensatorOutputParser,
 } from '../core/compensator.js'
-import type { Severity, OutputFormat, ChannelStatus, ReconciledResults, ReviewControls } from '../types.js'
+import type {
+  Severity,
+  OutputFormat,
+  ChannelStatus,
+  JobMetadata,
+  ReconciledResults,
+  ReviewControls,
+} from '../types.js'
 import { formatJson } from '../formatters/json.js'
 import { formatText } from '../formatters/text.js'
 import { formatMarkdown } from '../formatters/markdown.js'
@@ -100,6 +107,22 @@ function resolveDiff(args: ReviewArgs): string {
   return execFileSync('git', ['diff'], { encoding: 'utf-8', maxBuffer: MAX_DIFF_BUFFER })
 }
 
+/** Resolve the immutable identity needed to distinguish equal patches on different PR heads. */
+function resolveReviewTarget(args: ReviewArgs): string | undefined {
+  if (args.pr === undefined) return undefined
+  const raw = execFileSync(
+    'gh',
+    ['pr', 'view', String(args.pr), '--json', 'url,headRefOid'],
+    { encoding: 'utf-8', maxBuffer: MAX_DIFF_BUFFER },
+  )
+  const parsed = JSON.parse(raw) as { url?: unknown; headRefOid?: unknown }
+  if (typeof parsed.url !== 'string' || typeof parsed.headRefOid !== 'string'
+    || !/^[0-9a-f]{40,64}$/i.test(parsed.headRefOid)) {
+    throw new Error(`Could not resolve exact head for PR #${args.pr}`)
+  }
+  return `${parsed.url}@${parsed.headRefOid.toLowerCase()}`
+}
+
 /** Stamp proposed config/ack changes onto an output object (trust transparency). */
 function annotateProposedChanges(target: Record<string, unknown>, changes: ConfigChangeReport): void {
   if (changes.ack_files_changed.length > 0) target.proposed_acks = changes.ack_files_changed
@@ -110,6 +133,63 @@ function formatReconciledResults(results: ReconciledResults, outputFormat: Outpu
   if (outputFormat === 'text') return formatText(results)
   if (outputFormat === 'markdown') return formatMarkdown(results)
   return formatJson(results)
+}
+
+/**
+ * Return the prior job when a session is about to review identical content.
+ * The sole exception is a same-round retry after no channel determination.
+ */
+function duplicateSessionTarget(
+  sessionStore: SessionStore,
+  sessionId: string,
+  diff: string,
+  round: number | undefined,
+  reviewTarget: string | undefined,
+): string | undefined {
+  const jobStore = new JobStore(resolveJobsDir())
+  const record = sessionStore.show(sessionId)
+  const cycleMatch = sessionId.match(/^(.*-cycle-)[1-9][0-9]*$/)
+  const records = cycleMatch === null
+    ? (record === undefined ? [] : [record])
+    : sessionStore.list().filter((candidate) =>
+      candidate.session_id.startsWith(cycleMatch[1]) &&
+      /^[1-9][0-9]*$/.test(candidate.session_id.slice(cycleMatch[1].length)),
+    )
+  const matchingJobs = records.flatMap((candidate) => candidate.jobs.map((jobId) => ({
+    jobId,
+    sessionId: candidate.session_id,
+  }))).filter(({ jobId, sessionId: candidateSessionId }) => {
+    try {
+      if (jobStore.loadDiff(jobId) !== diff) return false
+      if (reviewTarget === undefined) return true
+      const priorTarget = jobStore.loadJob(jobId).review_target
+      return priorTarget === reviewTarget || (priorTarget === undefined && candidateSessionId === sessionId)
+    } catch {
+      return false
+    }
+  }).map(({ jobId }) => jobId)
+  if (matchingJobs.length === 0) return undefined
+
+  const priorJobId = record?.jobs.at(-1)
+  if (record !== undefined && priorJobId !== undefined && matchingJobs.includes(priorJobId)
+    && round === record.rounds && matchingJobs.every((jobId) => jobId === priorJobId)) {
+    const attempts = record.jobs.filter((jobId) => {
+      try {
+        return jobStore.loadJob(jobId).round === round
+      } catch {
+        return false
+      }
+    }).length
+    if (attempts !== 1) return priorJobId
+    try {
+      const resultPath = `${jobStore.getJobDir(priorJobId)}/results.json`
+      const result = JSON.parse(fs.readFileSync(resultPath, 'utf-8')) as { verdict?: string }
+      if (result.verdict === 'needs-user-decision') return undefined
+    } catch {
+      // Identical content without a trustworthy result is not safe to repeat.
+    }
+  }
+  return matchingJobs[0]
 }
 
 function buildMaxRoundsExceededResult(
@@ -468,8 +548,16 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       return
     }
 
-    // 2. Resolve diff input
+    // 2. Bind a PR diff to one immutable head. GitHub serves the diff and head
+    // through separate calls, so reject a push that lands between them.
+    const reviewTargetBeforeDiff = resolveReviewTarget(args)
     const diff = resolveDiff(args)
+    const reviewTarget = resolveReviewTarget(args)
+    if (reviewTargetBeforeDiff !== reviewTarget) {
+      console.error('PR head changed while its diff was being captured; review the new exact head instead.')
+      process.exitCode = 1
+      return
+    }
     if (!diff.trim()) {
       console.error('No diff content found. Provide --diff, --pr, --staged, or --base/--head.')
       process.exit(1)
@@ -495,7 +583,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     // 2b. Trust gate — UNCONDITIONAL (before dry-run, job creation, and
     //     dispatch), so it can't be bypassed by omitting --sync or using
     //     --dry-run. A base-ref diff proposing project config/acks short-
-    //     circuits to needs-user-decision (exit 2) until a human ratifies.
+    //     circuits to needs-user-decision (exit 3) until a human ratifies.
     if (blockingConfigChange || blockingAckChange) {
       const outputFormat = (args.format ?? config.defaults.format ?? 'json') as OutputFormat
       const reason =
@@ -519,7 +607,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       console.log(outputFormat === 'json' ? JSON.stringify(decision, null, 2) : String(decision.summary))
       // exitCode + return (not process.exit) for consistency with the early
       // guards and so the handler stays unit-testable without mocking exit.
-      process.exitCode = 2
+      process.exitCode = 3
       return
     }
 
@@ -633,49 +721,74 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       process.exit(1)
     }
 
-    // 5. Create job
+    // 5. Reserve and create the job. A family lock keeps duplicate detection
+    // and session linking atomic across concurrent CLI processes and cycles.
     const jobsDir = resolveJobsDir()
     const store = new JobStore(jobsDir)
-    const job = store.createJob({
-      fix_threshold: config.defaults.fix_threshold as Severity,
-      min_completed_channels: config.defaults.min_completed_channels,
-      format: config.defaults.format as OutputFormat,
-      channels: channelNames,
-      session_id: args.session,
-      round: args.round,
-      review_controls: reviewControls,
-      // Persist trust context so the pipeline re-surfaces it on every run.
-      trust_mode: trust.trust_mode,
-      ...(diffChanges.ack_files_changed.length > 0 ? { proposed_acks: diffChanges.ack_files_changed } : {}),
-      ...(diffChanges.config_file_changed ? { proposed_config_change: true } : {}),
-    })
-    if (sessionLink) {
-      try {
-        sessionLink.store.addJob(sessionLink.id, job.job_id, args.round ?? 1)
-      } catch (err) {
-        // Linking failed after the job dir was created. Remove the orphaned job
-        // so the auto-link invariant holds: a job that records a session_id is
-        // always present in that session's jobs[] array (never half-linked).
-        // The invariant covers in-process failures; abrupt termination (SIGKILL,
-        // OOM) between createJob and addJob can still leave a half-linked job,
-        // but its job.json carries session_id so it remains traceable.
-        // Guard the cleanup so a failed rmSync can't mask the original error.
-        try {
-          fs.rmSync(store.getJobDir(job.job_id), { recursive: true, force: true })
-        } catch {
-          // best-effort cleanup; fall through to report the original failure
-        }
-        console.error(
-          `Failed to link job ${job.job_id} to session ${sessionLink.id}: ` +
-            (err instanceof Error ? err.message : String(err)),
+    let job: JobMetadata | undefined
+    let duplicateJob: string | undefined
+    let linkError: unknown
+    const reserveJob = (): void => {
+      if (sessionLink !== undefined) {
+        duplicateJob = duplicateSessionTarget(
+          sessionLink.store,
+          sessionLink.id,
+          diff,
+          args.round,
+          reviewTarget,
         )
-        // Set the exit code and return rather than process.exit(1): it lets
-        // stderr flush, and keeps the handler unit-testable without mocking
-        // process.exit. Returning aborts before channel dispatch, as intended.
-        process.exitCode = 1
-        return
+        if (duplicateJob !== undefined) return
       }
+      const createdJob = store.createJob({
+        fix_threshold: config.defaults.fix_threshold as Severity,
+        min_completed_channels: config.defaults.min_completed_channels,
+        format: config.defaults.format as OutputFormat,
+        channels: channelNames,
+        session_id: args.session,
+        round: args.round,
+        review_target: reviewTarget,
+        review_controls: reviewControls,
+        trust_mode: trust.trust_mode,
+        ...(diffChanges.ack_files_changed.length > 0 ? { proposed_acks: diffChanges.ack_files_changed } : {}),
+        ...(diffChanges.config_file_changed ? { proposed_config_change: true } : {}),
+      })
+      if (sessionLink !== undefined) {
+        try {
+          sessionLink.store.addJob(sessionLink.id, createdJob.job_id, args.round ?? 1)
+        } catch (err) {
+          linkError = err
+          try {
+            fs.rmSync(store.getJobDir(createdJob.job_id), { recursive: true, force: true })
+          } catch {
+            // Preserve the original session-link failure.
+          }
+          return
+        }
+      }
+      job = createdJob
     }
+    if (sessionLink !== undefined) {
+      sessionLink.store.withFamilyLock(sessionLink.id, reserveJob)
+    } else {
+      reserveJob()
+    }
+    if (duplicateJob !== undefined) {
+      console.error(
+        `Exact review target already dispatched in ${duplicateJob}; ` +
+        'disposition that job instead of consuming another round.',
+      )
+      process.exitCode = 1
+      return
+    }
+    if (linkError !== undefined) {
+      console.error(
+        `Failed to link job to session ${sessionLink?.id}: ` +
+          (linkError instanceof Error ? linkError.message : String(linkError)),
+      )
+      process.exitCode = 1
+      return
+    }
+    if (job === undefined) throw new Error('Failed to reserve review job')
 
     // Record skipped/auth-failed channels in job metadata
     for (const name of channelNames) {
@@ -840,6 +953,7 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
       const ackStore = buildReviewAckStore({
         trustProjectAcks: honorWorkingTreeAcks,
         userRoot: resolveSessionRoot(),
+        jobRoot: store.getJobDir(completedJob.job_id),
         configBaseRef: baseRef,
         cwd,
       })

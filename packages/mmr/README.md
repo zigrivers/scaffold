@@ -464,6 +464,9 @@ Workflow:
     # Ack it with a reason:
     mmr ack add <finding_key> --reason "legacy module — scheduled rewrite in Q3"
 
+    # Disposition one refuted finding for this review job only:
+    mmr ack add <finding_key> --job <job_id> --scope job --reason "reject: verified duplicate"
+
     # List:
     mmr ack list
 
@@ -473,6 +476,9 @@ Workflow:
 By default (`--scope project`, the default), acks are stored at
 `./.mmr/acks/<finding_key>.json` (committed and shared with the team). Pass
 `--scope user` to store under `~/.mmr/acks/` (private to your machine).
+`--scope job` requires `--job` and an evidence-bearing `--reason`; it stores an
+exact-match disposition inside that immutable job and cannot affect another
+review or repository.
 
 Acked findings remain visible in `reconciled_findings` with
 `acknowledged: true` and `ack_match: 'exact' | 'fuzzy'`; they no longer

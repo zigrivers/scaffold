@@ -100,10 +100,11 @@ mark which parts are queue-only.
   `gh pr merge` directly — blocked by the mq-guard hook); otherwise
   serialize a merge-slot `gh pr merge --squash --delete-branch` —,
   (8) sync main via `make main-sync && make
-  prune-merged` — with step 5.5 = `mmr review --pr <N> --sync
-  --format json` between creating the PR and the gate/enqueue steps,
-  including the immediate keep-open path for a verified block and the 3-round
-  cap path for a verified fix-now item that remains
+  prune-merged` — with step 5.5 = `mmr review --pr <N> --session
+  pr-<repo-id>-<N>-cycle-<C> --round <R> --max-rounds 3 --sync --format
+  json` between creating the PR and the gate/enqueue steps,
+  including autonomous bounded remediation when round three exposes a verified
+  in-scope or required-safeguard blocker
 - (deep) `scripts/setup-agent-worktree.sh` is confirmed present via
   `scaffold agent-ops install --component git` + `scaffold agent-ops
   check` — not hand-authored; creates worktrees at the project-local
@@ -365,19 +366,32 @@ Depth-gate per Methodology Scaling above.
    diff against the coding standards; the gate itself is step 6's
    `make check-affected`, not a full run here) -> (3) rebase -> (4) push ->
    (5) `gh pr create` (auto-applies `.github/pull_request_template.md`) ->
-   **step 5.5: `mmr review --pr <N> --sync --format json`** (mandatory;
+   **step 5.5: `mmr review --pr <N> --session pr-<repo-id>-<N>-cycle-<C>
+   --round <R> --max-rounds 3 --sync --format json`** (mandatory;
    group duplicate findings by root cause and give each one a finite
    disposition. The original bead and its acceptance criteria bound the PR's
    required scope. Severity alone never creates a bead. A follow-up must be
    reproducible, actionable, non-duplicate, worth scheduling, and outside
    scope. Mandatory guardrails include at minimum security, privacy, and data
    integrity (including preventing data loss or corruption), plus every
-   repository or product safeguard required by project instructions. Hard cap
-   3 rounds: review stops when every root cause has a disposition and no
-   verified fix-now or block item remains. A verified block ends review
-   immediately: keep the PR open, post the ledger and reproduction, notify the
-   user, and end the batch without merging. At the cap, use the same keep-open
-   exit for a verified fix-now item that remains) ->
+   repository or product safeguard required by project instructions. Use a
+   maximum of three rounds per review cycle. If round three finds a reproducible
+   acceptance-criteria or required-safeguard defect, make a concrete repair,
+   add focused regression proof, rerun the required gate, and review the new
+   exact head from round one in a new bounded cycle. Duplicate, stale,
+   hypothetical, speculative, cosmetic, or already-dispositioned findings
+   cannot restart review. No owner approval is required for in-scope
+   remediation. Continue until every root cause has a disposition and no
+   verified fix-now or block item remains. For a verified rejection that still
+   blocks MMR, record the evidence, use `mmr ack add`, then recompute with `mmr
+   results`; never acknowledge a verified blocker. Stop when the user asks to
+   stop. Otherwise stop only for an external dependency, missing credentials or
+   authority, a destructive action, an out-of-scope material product decision,
+   or a demonstrated technical plateau after safe approaches are exhausted. An
+   unresolved required-safeguard defect is not a plateau.
+   Merge only when the final exact head meets the configured MMR channel floor,
+   required gates are green, every finding is dispositioned, and no verified
+   blocker remains) ->
    (6) confirm the fast
    gate green on the branch HEAD (`make check-affected`; run full `make
    check` instead when you touched gate config, shared test utils, or
@@ -455,7 +469,7 @@ is detected on the `gh pr create` trigger string):
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '.tool_input.command // empty' | grep -q 'gh pr create' && echo 'MANDATORY: run mmr review --pr <PR#> --sync --format json before moving on (3-round cap; see docs/git-workflow.md).' || true"
+            "command": "jq -r '.tool_input.command // empty' | grep -q 'gh pr create' && echo 'MANDATORY: run mmr review --pr <PR#> --session pr-<repo-id>-<PR#>-cycle-<C> --round <R> --max-rounds 3 --sync --format json before moving on (maximum 3 rounds per bounded cycle; after a concrete repair, review the new exact head from round 1; see docs/git-workflow.md).' || true"
           }
         ]
       }

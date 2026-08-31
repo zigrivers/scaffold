@@ -87,16 +87,16 @@ AI agent commits should include the Co-Authored-By trailer for attribution and a
 
 ### Pull Request Workflow
 
-Standard PR lifecycle (the harmonized 8-step workflow, with the mandatory
-AI review inserted as step 5.5):
+Standard PR lifecycle (the harmonized 8-step workflow, with mandatory AI review inserted as step 5.5):
 1. Commit — on a branch created from `main`, with passing tests
 2. Local review — `make check` green, re-read the diff
 3. Rebase onto latest `origin/main`
 4. Push the branch
 5. Create the PR with a structured description
-   - **Step 5.5 — mandatory AI review**: `mmr review --pr <N> --sync
-     --format json` (finite root-cause dispositions; a verified block ends review
-     immediately; otherwise cap 3 rounds and keep the PR open if required work remains)
+   - **Step 5.5 — mandatory AI review**: `mmr review --pr <N> --session pr-<repo-id>-<N>-cycle-<C>
+     --round <R> --max-rounds 3 --sync --format json` (finite root-cause dispositions; at most three rounds per
+     cycle; a repaired round-three in-scope blocker restarts at round one in a
+     new bounded cycle on the same PR)
 6. Watch the local quality gates — pre-commit hooks ran, `make check-affected`
    (the fast merge gate) passes on the branch HEAD; the full `make check` runs
    post-merge and nightly — uncached — on the self-hosted runner or local
@@ -130,9 +130,9 @@ until a launch or deploy target is chosen:
    per-merge gate; full `make check` is the safety net)
 3. **Agent self-review** — re-read the diff against the project's coding
    standards before pushing
-4. **`mmr review --pr <N> --sync --format json`** — mandatory multi-model AI
-   review (finite root-cause dispositions, immediate keep-open exit on a
-   verified block, otherwise a 3-round cap)
+4. **`mmr review --pr <N> --session pr-<repo-id>-<N>-cycle-<C> --round <R> --max-rounds 3 --sync --format json`** — mandatory multi-model AI
+   review (finite root-cause dispositions and at most three rounds per bounded
+   remediation cycle)
 
 For a **base project**, `.github/workflows/` is deliberately absent until a
 launch/deploy target is picked — nothing runs these checks server-side yet, so

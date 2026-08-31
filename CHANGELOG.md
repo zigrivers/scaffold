@@ -4,6 +4,23 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- **In-scope review remediation is now autonomous.** MMR remains capped at
+  three rounds per cycle, but a reproducible round-three acceptance-criteria or
+  required-safeguard blocker can start a fresh bounded cycle on the same PR
+  after a concrete repair, focused regression proof, and the required gate.
+  Duplicate, stale, speculative, cosmetic, and already-dispositioned findings
+  cannot restart review, and merge still requires a reviewed exact head with no
+  verified blocker. Evidence-backed refutations use an exact-match,
+  review-job-only disposition instead of a persistent cross-project
+  acknowledgment. A config/ack trust-gate stop now returns exit 3
+  (`needs-user-decision`) instead of exit 2 (`blocked`), matching its verdict.
+  PR jobs persist the PR URL and exact head object ID, so an unchanged patch on
+  a rebased head can receive its required review while a repeated exact head is
+  still rejected. Generated direct-review guidance now always supplies the
+  session, round, and three-round bound explicitly.
+
 ## [3.54.1] - 2026-08-30
 
 Bounded review-follow-up release. Multi-model review remains mandatory, but

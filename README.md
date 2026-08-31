@@ -1409,7 +1409,7 @@ When multiple channels return findings, mmr applies consensus rules:
 | All channels approve (no findings) | **High** | Gate passed |
 | One channel flags P0, others approve | **High** | Report P0 (critical from any source) |
 | One channel flags P1/P2, others approve | **Medium** | Report with attribution |
-| Channels contradict each other | **Low** | Present both for user adjudication |
+| Channels contradict each other | **Low** | Acting agent verifies and records one evidence-backed disposition |
 
 > **A clean run still needs a quorum.** Since mmr 4.0.0 the verdict also reflects
 > how many channels actually reported. If fewer than
@@ -1418,6 +1418,16 @@ When multiple channels return findings, mmr applies consensus rules:
 > reviewer agreeing with itself is not multi-model review. Run `mmr doctor` to
 > see which channel is missing. A real blocking finding still reports as
 > `blocked` regardless of the floor.
+
+> **Review remediation is autonomous and bounded.** Each MMR review cycle has
+> at most three rounds. If round three confirms an in-scope or required-safeguard
+> blocker, repair it, add focused regression proof, pass the required gate, and
+> review the new exact head from round one in a new cycle on the same PR. No
+> owner approval is required. Duplicate, stale, hypothetical, speculative,
+> cosmetic, or already-dispositioned findings cannot restart a cycle, and a PR
+> never merges with a verified blocker. Stop when the user asks to stop;
+> otherwise use only the evidence-backed stopping conditions in
+> `docs/review-standards.md`.
 
 ### How It Works
 
@@ -1431,7 +1441,7 @@ When multiple channels return findings, mmr applies consensus rules:
 | All channels approve | **High** | Proceed confidently |
 | One channel flags P0, others approve | **High** | Fix it (P0 is critical) |
 | One channel flags P1, others approve | **Medium** | Review before fixing |
-| Channels contradict each other | **Low** | Present all perspectives to user |
+| Channels contradict each other | **Low** | Acting agent verifies and records one evidence-backed disposition |
 | Compensating-pass P0/P1/P2 finding | **Single-source** | Fix per normal thresholds, label as compensating |
 
 Scaffold verifies CLI authentication before every dispatch. If a token has expired, it tells you and provides the command to re-authenticate — it never silently skips a review.

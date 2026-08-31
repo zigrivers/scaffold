@@ -1,6 +1,6 @@
-## Beads Task
+## Tracking
 
-BD-<!-- task ID here -->
+No Scaffold Bead. This repository does not use Beads for task tracking.
 
 ## Summary
 
@@ -10,14 +10,19 @@ BD-<!-- task ID here -->
 
 ## Testing
 
-- [ ] `make check` passes (lint + validate + test)
-- [ ] `make lint` — ShellCheck clean
-- [ ] `make test` — bats tests pass
-- [ ] `make validate` — frontmatter valid
+- [ ] `make check-all` passes on the pull request head
+
+## Review evidence
+
+- Reviewed exact head: <!-- commit SHA -->
+- MMR cycle and round: <!-- cycle N, round N -->
+- Configured MMR channel floor met: <!-- result -->
+- Disposition ledger: <!-- one finite disposition per semantic finding -->
+- Verified blockers remaining: <!-- none, or list each blocker -->
 
 ## Checklist
 
-- [ ] Commit messages follow `[BD-<id>] type(scope): description`
-- [ ] New scripts have tests in `tests/`
+- [ ] New behavior has focused regression proof
 - [ ] No secrets or credentials committed
-- [ ] Docs updated if behavior changed
+- [ ] Privacy, security, accessibility, and data-integrity safeguards remain intact
+- [ ] Docs and changelog updated if behavior changed

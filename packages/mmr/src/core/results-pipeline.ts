@@ -209,6 +209,7 @@ export function runResultsPipeline(
         if (match) {
           f.acknowledged = true
           f.ack_match = match.match
+          f.ack_scope = match.scope
           if (match.record.reason !== undefined) f.ack_reason = match.record.reason
         }
       }
@@ -242,7 +243,7 @@ export function runResultsPipeline(
     : '0s'
 
   const approved = verdict === 'pass' || verdict === 'degraded-pass'
-  const summary = approved
+  const baseSummary = approved
     ? `Review passed${verdict === 'degraded-pass'
       ? ` (degraded — ${completedChannels} of ${Object.keys(job.channels).length} channels reported)`
       : ''}`
@@ -259,6 +260,10 @@ export function runResultsPipeline(
         const blockingCount = reconciledFindings.filter((f) => isBlockingFinding(f, fixThreshold)).length
         return `Review blocked — ${blockingCount} finding(s) at or above ${fixThreshold}`
       })()
+  const acknowledgedCount = reconciledFindings.filter((f) => f.acknowledged === true).length
+  const summary = acknowledgedCount === 0
+    ? baseSummary
+    : `${baseSummary}; ${acknowledgedCount} acknowledged disposition${acknowledgedCount === 1 ? '' : 's'} recorded`
 
   const advisoryCount = reconciledFindings.filter((f) => isAdvisoryFinding(f, fixThreshold)).length
 
@@ -276,12 +281,14 @@ export function runResultsPipeline(
       channels_completed: completedChannels,
       channels_partial: Object.values(job.channels)
         .filter((ch) => ['failed', 'timeout'].includes(ch.status)).length,
+      acknowledged_findings: acknowledgedCount,
       total_elapsed: totalElapsed,
     },
   }
 
   // Re-surface trust context persisted on the job at review time (§5 decision
   // 1), so review --sync, `mmr results`, and `mmr reconcile` all carry it.
+  if (job.review_target !== undefined) results.review_target = job.review_target
   if (job.trust_mode !== undefined) results.trust_mode = job.trust_mode
   if (job.proposed_acks !== undefined) results.proposed_acks = job.proposed_acks
   if (job.proposed_config_change !== undefined) results.proposed_config_change = job.proposed_config_change

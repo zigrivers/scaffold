@@ -391,8 +391,10 @@ options today:
    MMR channel is planned. See spec §A.4 and the Phase 5 roadmap notes below.
 
 When reviewing manually, follow the project's
-[3-round-per-finding-hash limit](../../CLAUDE.md#mandatory-code-review) — stop
-and surface to the user when a blocking finding's hash hits 3 attempts.
+[bounded review-cycle policy](../review-standards.md#bounded-review-cycles): at
+most three rounds per cycle, then a fresh cycle only after a concrete repair,
+focused regression proof, and the required gate pass. Do not merge a verified
+blocker.
 
 ## 9. Failure modes and recovery
 

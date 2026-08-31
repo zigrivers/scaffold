@@ -38,9 +38,19 @@ describe('mmr sessions CLI', () => {
     try {
       await runMmr(['sessions', 'start', 'feat-foo'], tmpHome)
       const listed = await runMmr(['sessions', 'list'], tmpHome)
-      expect(listed.stdout).toMatch(/feat-foo/)
+      expect(JSON.parse(listed.stdout)).toEqual([
+        expect.objectContaining({
+          session_id: 'feat-foo',
+          jobs: [],
+          rounds: 0,
+        }),
+      ])
       const shown = await runMmr(['sessions', 'show', 'feat-foo'], tmpHome)
-      expect(shown.stdout).toMatch(/feat-foo/)
+      expect(JSON.parse(shown.stdout)).toEqual(expect.objectContaining({
+        session_id: 'feat-foo',
+        jobs: [],
+        rounds: 0,
+      }))
       await runMmr(['sessions', 'end', 'feat-foo'], tmpHome)
       const after = await runMmr(['sessions', 'list'], tmpHome)
       expect(after.stdout).not.toMatch(/feat-foo/)

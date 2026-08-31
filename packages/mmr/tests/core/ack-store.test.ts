@@ -48,6 +48,24 @@ describe('AckStore', () => {
     expect(fs.existsSync(fp)).toBe(true)
   })
 
+  it('keeps a job disposition exact-only and isolated to one review job', () => {
+    const firstJob = path.join(tmpHome, '.mmr', 'jobs', `mmr-${'a'.repeat(12)}`)
+    const secondJob = path.join(tmpHome, '.mmr', 'jobs', `mmr-${'b'.repeat(12)}`)
+    const first = new AckStore({ userRoot: path.join(tmpHome, '.mmr'), jobRoot: firstJob })
+    const second = new AckStore({ userRoot: path.join(tmpHome, '.mmr'), jobRoot: secondJob })
+    first.add({
+      finding_key: FAKE_KEY,
+      normalized_location: 'src/foo.ts',
+      description_shingle: SHINGLE,
+      reason: 'reject: verified duplicate',
+      created_at: '2026-08-30T00:00:00Z',
+    }, 'job')
+
+    expect(first.lookup({ finding_key: FAKE_KEY, normalized_location: 'src/foo.ts', shingle: SHINGLE })?.scope).toBe('job')
+    expect(first.lookup({ finding_key: 'b'.repeat(40), normalized_location: 'src/foo.ts', shingle: SHINGLE })).toBeUndefined()
+    expect(second.lookup({ finding_key: FAKE_KEY, normalized_location: 'src/foo.ts', shingle: SHINGLE })).toBeUndefined()
+  })
+
   it('REJECTS a non-sha1 finding_key BEFORE constructing a path', () => {
     const record: AckRecord = {
       finding_key: '../../../etc/passwd',

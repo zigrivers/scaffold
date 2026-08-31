@@ -35,6 +35,20 @@ describe('runResultsPipeline', () => {
     expect(exitCode).toBe(0)
   })
 
+  it('exposes the exact review target captured with the diff', () => {
+    const reviewTarget = 'https://github.com/acme/app/pull/7@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    const job = store.createJob({
+      fix_threshold: 'P2', format: 'json', channels: ['claude'], min_completed_channels: 1,
+      review_target: reviewTarget,
+    })
+    store.updateChannel(job.job_id, 'claude', { status: 'completed' })
+    store.saveChannelOutput(job.job_id, 'claude', '{"approved": true, "findings": [], "summary": "ok"}')
+
+    const { results, formatted } = runResultsPipeline(store, store.loadJob(job.job_id), 'json')
+    expect(results.review_target).toBe(reviewTarget)
+    expect(JSON.parse(formatted).review_target).toBe(reviewTarget)
+  })
+
   it('will not pass a clean single-channel review (completion floor)', () => {
     // Pre-4.0.0 this was `pass` with exit 0: one dispatched channel that
     // completes satisfies completed === dispatched, so the run was not even

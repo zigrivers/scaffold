@@ -123,8 +123,9 @@ a diff first.
 
 ## Step 3 — Read the verdict, then act
 
-Every review collapses to exactly one of four verdicts. The verdict, not the raw
-findings, is what decides whether you proceed. The
+Every review collapses to exactly one of four verdicts. The verdict gates merge;
+the acting agent uses the evidence and original acceptance criteria to decide
+whether a new remediation cycle is warranted. The
 [MMR reference](../mmr/index.md) defines the gate, the severity tiers, and the
 exact derivation algorithm; this table is the *action* you take for each outcome.
 
@@ -132,8 +133,8 @@ exact derivation algorithm; this table is the *action* you take for each outcome
 | --- | --- | --- |
 | `pass` | 0 | **Proceed** — merge / push / next task. |
 | `degraded-pass` | 0 | **Proceed**, noting reduced coverage. The max achievable verdict once any channel was compensated. |
-| `blocked` | 2 | **Stop.** Fix the blocking findings (Step 4), then re-review. Do not merge. |
-| `needs-user-decision` | 3 | **Stop and surface to the user.** Automated iteration can't resolve this. |
+| `blocked` | 2 | **Do not merge.** Fix the verified blocker, then re-review. |
+| `needs-user-decision` | 3 | **Do not merge.** Restore the channel floor, verify any trust change, or apply the bounded-cycle and stopping rules below. |
 
 A review is `blocked` when any unacknowledged finding sits at or above the fix
 threshold (:sev[P2]{level=p2} by default; override per-run with
@@ -152,47 +153,67 @@ finding is always reported as `blocked`.
 :::
 
 :::callout{type=warning}
-**Proceed only on `pass` or `degraded-pass`.** On `blocked` or
-`needs-user-decision`, never merge automatically — surface the verdict and the
-remaining findings to the user. The wrappers enforce this: report only says the
-PR is merge-ready on `pass` / `degraded-pass`
-:cite[content/tools/review-pr.md:147].
+**Proceed only on `pass` or `degraded-pass`.** Never merge on `blocked` or
+`needs-user-decision`. A final-round in-scope blocker starts the bounded repair
+process below; it does not require owner approval. The wrappers report a PR as
+merge-ready only on `pass` / `degraded-pass`
+:cite[content/tools/review-pr.md:207].
 :::
 
-## Step 4 — Fix the blocking findings (bounded)
+## Step 4 — Fix blocking findings in bounded cycles
 
-When the verdict is `blocked`, the loop is: fix the findings at or above the
-threshold → re-review → repeat. The guard rail is that this loop is **bounded
-per finding**, so a finding the model can't actually fix doesn't trap you in an
-infinite cycle.
+When the verdict is `blocked`, the loop is: verify each finding → repair the
+smallest root cause → add focused regression proof → run the required gate →
+review the new exact head. Every semantic finding receives one finite,
+evidence-backed disposition.
 
-### The 3-round-per-finding limit
+If a verified refutation, duplicate, or stale finding still blocks MMR, copy the
+evidence into the PR disposition ledger, run `mmr ack add <finding-key> --job
+<job-id> --scope job --reason "reject: <evidence>"`, then recompute with `mmr
+results <job-id>`. The finding stays visible but no longer blocks. Never
+acknowledge a verified blocker or required-safeguard defect.
 
-The limit is **3 attempts per finding**, not 3 rounds total. Each round that
-surfaces *genuinely new* findings is healthy iteration — keep going. The loop
-stops only when one specific finding has been attempted three times without
-resolution.
+### Maximum three rounds per review cycle
 
-A "finding" here is its **stable identity**, not its wording, so a re-worded
-report of the same defect still counts against the same finding. (The
-[MMR reference](../mmr/index.md) covers how that identity is computed.) Co-equal
-stop conditions:
+Each MMR session is one review cycle with at most three rounds. A cycle never
+dispatches round four. If round three finds a reproducible defect within the
+original acceptance criteria or a required safeguard, make a concrete repair,
+add focused regression proof, rerun the required gate, then start a new bounded
+cycle on the same PR. Reset the round to one and review the new exact head.
+On resume, recover the active cycle and round from the PR disposition ledger and
+MMR session history; use cycle one only when neither contains a prior review.
 
-- A finding's identity reaches 3 recorded attempts.
-- The same underlying defect recurs across 3 rounds even if the reviewer's
-  wording produces a new identity each time.
-- Channels genuinely contradict each other (→ `needs-user-decision`).
-- The user explicitly asks to stop.
+Duplicate, stale, hypothetical, speculative, cosmetic, or already-dispositioned
+findings cannot start a new cycle. A model's severity label alone never controls
+the decision, and no extra round runs merely to obtain a cosmetically clean
+response.
 
-When you stop, **do not merge**. Document each unresolved finding (severity,
-location, attempt count) and hand the decision to the user
-:cite[content/tools/review-pr.md:147].
+Continue until every root cause has a disposition and no verified fix-now or
+block item remains. No owner approval is required for in-scope remediation.
+Stop when the user asks to stop. Otherwise stop only for a true external
+dependency, missing credentials or authority, a destructive action, a material
+product decision outside the acceptance criteria, or a demonstrated technical
+plateau after safe approaches are exhausted. Record exact evidence. An
+unresolved required safeguard is not a plateau; continue repairing it. Required
+safeguards include security, privacy, accessibility, data integrity, and
+project-specific product protections.
+
+An unchanged exact target gets at most one same-round retry after
+`needs-user-decision`. If that retry also cannot meet the channel floor, record
+the channel failures and stop on the external dependency or missing credentials.
+Do not start a remediation cycle, change product code, or lower the floor merely
+to retry identical content. A verified blocker still outranks the channel floor
+and follows the repair rule above.
+
+Merge only when the final exact head has completed the configured MMR channel
+floor, required gates are green, every finding is dispositioned, and no
+verified blocker remains :cite[content/tools/review-pr.md:207].
 
 ### How the round budget is enforced
 
 Round-bounding is **native** to the engine. The wrappers pass `mmr review
---session <id> --round <N> --max-rounds 3`
-:cite[content/tools/review-pr.md:81], incrementing `--round` each fix round
+--session <target>-cycle-<C> --round <N> --max-rounds 3`
+:cite[content/tools/review-pr.md:112], incrementing `--round` each fix round
 (`--round` is required — MMR compares it against `--max-rounds`, so without it
 every call is round 1 and the cap never fires). MMR enforces the budget using a
 stable, line-number-independent `finding_key`
@@ -200,8 +221,9 @@ stable, line-number-independent `finding_key`
 severity changes and line-number shifts (a materially reworded description does
 change the key, since description and suggestion are part of it). (See the
 [MMR reference](../mmr/index.md) for how that key collapses the same issue at
-different severities.) A finding that survives the budget stops being
-re-attempted; you don't track strikes by hand.
+different severities.) A finding that survives a cycle is not re-attempted in
+that session; after a concrete repair, the next bounded cycle uses a new session
+id. You do not track strikes by hand.
 
 This replaced the former wrapper-side attempts file
 (`.scaffold/review-attempts/<session-id>.json`), retired when the review tools

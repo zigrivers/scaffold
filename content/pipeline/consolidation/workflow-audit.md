@@ -55,7 +55,7 @@ all issues found.
 ## Quality Criteria
 - (mvp) AGENTS.md contains the 8-step ship-loop summary ending in the batch
   report, and docs/git-workflow.md documents all 8 PR-workflow steps plus
-  step 5.5 (`mmr review --pr <N> --sync --format json`) — the two
+  step 5.5 (`mmr review --pr <N> --session pr-<repo-id>-<N>-cycle-<C> --round <R> --max-rounds 3 --sync --format json`) — the two
   enumerations agree rather than compete
 - (mvp) The traceable-IDs convention is consistent everywhere (CLAUDE.md,
   AGENTS.md, docs/git-workflow.md, docs/coding-standards.md,

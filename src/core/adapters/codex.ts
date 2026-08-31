@@ -41,10 +41,108 @@ const PHASE_ORDER = [
 //
 // Source-of-truth meta-prompts: `content/tools/review-code.md` and
 // `content/tools/review-pr.md`. Keep the resolution chain and command
-// shape here in sync with those files. Note: those prompts add
-// `--session/--round/--max-rounds` for the Claude Code fix LOOP; Codex runs a
-// recipe once (single shot, no loop), so round-bounding adds nothing here and
-// is deliberately omitted.
+// shape here in sync with those files, including native per-cycle round bounds.
+const CODEX_REPO_ID_SETUP = `REPO_ID=$(
+  (git config --get remote.origin.url 2>/dev/null || git rev-parse --show-toplevel) |
+    git hash-object --stdin | cut -c1-12
+)`
+
+const CODEX_RESUME_SETUP = `resolve_mmr_position() {
+  local session_prefix="$1" retry_same_round="\${2:-auto}"
+  local session_list latest_cycle session_json recorded_rounds override=false
+  RESOLVED_SESSION_JSON=""
+
+  if [ -n "\${CYCLE+x}" ] || [ -n "\${ROUND+x}" ]; then
+    if [ -z "\${CYCLE+x}" ] || [ -z "\${ROUND+x}" ]; then
+      echo "Set both CYCLE and ROUND, or leave both unset for session recovery." >&2
+      return 1
+    fi
+    if ! [[ "$CYCLE" =~ ^[1-9][0-9]*$ && "$ROUND" =~ ^[1-3]$ ]]; then
+      echo "CYCLE must be positive and ROUND must be 1, 2, or 3." >&2
+      return 1
+    fi
+    override=true
+  fi
+
+  session_list=$(mmr sessions list) || {
+    echo "Cannot read MMR session history; repair it before review." >&2; return 1
+  }
+  latest_cycle=$(printf '%s' "$session_list" | node -e '
+const sessions = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+const prefix = process.argv[1];
+const cycles = sessions.map(({ session_id }) =>
+  session_id.startsWith(prefix) ? Number(session_id.slice(prefix.length)) : NaN
+).filter((cycle) => Number.isInteger(cycle) && cycle > 0);
+if (cycles.length) process.stdout.write(String(Math.max(...cycles)));
+' "$session_prefix") || return 1
+
+  if [ -z "$latest_cycle" ]; then
+    if [ "$override" = true ] && { [ "$CYCLE" -ne 1 ] || [ "$ROUND" -ne 1 ]; }; then
+      echo "CYCLE=$CYCLE ROUND=$ROUND does not match MMR session history; expected CYCLE=1 ROUND=1." >&2
+      return 1
+    fi
+    CYCLE=1; ROUND=1
+    return 0
+  fi
+
+  session_json=$(mmr sessions show "$session_prefix$latest_cycle") || return 1
+  RESOLVED_SESSION_JSON="$session_json"
+  recorded_rounds=$(printf '%s' "$session_json" | node -e '
+const record = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+if (!Number.isInteger(record.rounds) || record.rounds < 0 || record.rounds > 3) process.exit(1);
+process.stdout.write(String(record.rounds));
+') || { echo "Invalid MMR session record; reconcile it before review." >&2; return 1; }
+
+  if [ "$retry_same_round" = auto ]; then
+    local latest_job prior_result prior_status=0 prior_verdict
+    latest_job=$(printf '%s' "$session_json" | node -e '
+const record = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+const job = record.jobs?.at(-1);
+if (job !== undefined) process.stdout.write(String(job));
+') || { echo "Invalid MMR session record; reconcile it before review." >&2; return 1; }
+    retry_same_round=false
+    if [ -n "$latest_job" ]; then
+      prior_result=$(mmr results "$latest_job" --format json) || prior_status=$?
+      if [ "$prior_status" -ne 0 ] && [ "$prior_status" -ne 2 ] && [ "$prior_status" -ne 3 ]; then
+        echo "Cannot read the latest MMR verdict; reconcile it before review." >&2; return 1
+      fi
+      prior_verdict=$(printf '%s' "$prior_result" | node -e '
+const result = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+if (!["pass", "degraded-pass", "blocked", "needs-user-decision"].includes(result.verdict)) process.exit(1);
+process.stdout.write(result.verdict);
+') || { echo "Invalid latest MMR verdict; reconcile it before review." >&2; return 1; }
+      [ "$prior_verdict" = "needs-user-decision" ] && retry_same_round=true
+    fi
+  fi
+
+  if [ "$override" = true ]; then
+    if [ "$retry_same_round" = true ] && [ "$CYCLE" -eq "$latest_cycle" ] \
+      && [ "$ROUND" -eq "$recorded_rounds" ]; then
+      return 0
+    fi
+    if [ "$CYCLE" -eq "$latest_cycle" ] && [ "$recorded_rounds" -lt 3 ] \
+      && [ "$ROUND" -eq "$((recorded_rounds + 1))" ]; then
+      return 0
+    fi
+    if [ "$CYCLE" -eq "$((latest_cycle + 1))" ] && [ "$recorded_rounds" -eq 3 ] \
+      && [ "$ROUND" -eq 1 ]; then
+      return 0
+    fi
+    echo "CYCLE=$CYCLE ROUND=$ROUND does not match MMR session history." >&2
+    return 1
+  fi
+
+  if [ "$recorded_rounds" -ge 3 ]; then
+    echo "Latest cycle reached round 3. After a verified repair and required gate," \
+      "set CYCLE=$((latest_cycle + 1)) ROUND=1; otherwise stop." >&2
+    return 1
+  fi
+  CYCLE="$latest_cycle"
+  if [ "$retry_same_round" = true ]; then ROUND="$recorded_rounds"
+  else ROUND="$((recorded_rounds + 1))"
+  fi
+}`
+
 const CODEX_EXECUTOR_RECIPES: Record<string, string> = {
   'review-code': `Run multi-model review on local code before commit or push
 (4 MMR CLI channels: Codex, Claude, Grok, Antigravity). Pick **one** of the three modes
@@ -66,34 +164,76 @@ elif git rev-parse --verify HEAD~1        >/dev/null 2>&1; then BASE_REF=HEAD~1
 else                                                            BASE_REF=HEAD
 fi
 MERGE_BASE=$(git merge-base "$BASE_REF" HEAD 2>/dev/null || echo "$BASE_REF")
-
-# --quiet exits 0 when there's no diff. Streams the diff directly into mmr
-# rather than buffering through a shell variable (large diffs can OOM).
+# --quiet exits 0 when there's no diff. Check before session recovery so a
+# no-change review does not require mmr to be installed or authenticated.
 if git diff --quiet "$MERGE_BASE"; then
   echo "No changes to review"; exit 0
 fi
-git diff "$MERGE_BASE" | mmr review --diff - --sync --format json
+BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+[ "$BRANCH" = "HEAD" ] && BRANCH="detached-$(git rev-parse --short HEAD 2>/dev/null)"
+${CODEX_REPO_ID_SETUP}
+BRANCH_SLUG=$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')
+BRANCH_HASH=$(printf '%s' "$BRANCH" | git hash-object --stdin | cut -c1-12)
+BRANCH_ID="$BRANCH_SLUG-$BRANCH_HASH"
+SESSION_ID="local-full-$REPO_ID-$BRANCH_ID"
+${CODEX_RESUME_SETUP}
+resolve_mmr_position "$SESSION_ID-cycle-" || exit 1
+MMR_FLAGS=(--session "$SESSION_ID-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json)
+
+# Stream the diff directly into mmr rather than buffering through a shell
+# variable (large diffs can OOM).
+git diff "$MERGE_BASE" | mmr review --diff - "\${MMR_FLAGS[@]}"
 \`\`\`
 
 **Mode 2 — staged changes only** (e.g. pre-commit gate):
 
 \`\`\`bash
-mmr review --staged --sync --format json
+BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+[ "$BRANCH" = "HEAD" ] && BRANCH="detached-$(git rev-parse --short HEAD 2>/dev/null)"
+${CODEX_REPO_ID_SETUP}
+BRANCH_SLUG=$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')
+BRANCH_HASH=$(printf '%s' "$BRANCH" | git hash-object --stdin | cut -c1-12)
+BRANCH_ID="$BRANCH_SLUG-$BRANCH_HASH"
+SESSION_ID="local-staged-$REPO_ID-$BRANCH_ID"
+${CODEX_RESUME_SETUP}
+resolve_mmr_position "$SESSION_ID-cycle-" || exit 1
+mmr review --staged --session "$SESSION_ID-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json
 \`\`\`
 
 **Mode 3 — explicit branch diff** (substitute the actual branch name for
 \`BRANCH_NAME\`):
 
 \`\`\`bash
-mmr review --base main --head BRANCH_NAME --sync --format json
+BRANCH_NAME="<branch-name>"
+BASE_REF=main
+BASE_ID=$(printf '%s' "$BASE_REF" | git hash-object --stdin | cut -c1-12)
+${CODEX_REPO_ID_SETUP}
+BRANCH_SLUG=$(printf '%s' "$BRANCH_NAME" | tr -c 'a-zA-Z0-9_-' '-')
+BRANCH_HASH=$(printf '%s' "$BRANCH_NAME" | git hash-object --stdin | cut -c1-12)
+BRANCH_ID="$BRANCH_SLUG-$BRANCH_HASH"
+SESSION_ID="local-range-$BASE_ID-$REPO_ID-$BRANCH_ID"
+${CODEX_RESUME_SETUP}
+resolve_mmr_position "$SESSION_ID-cycle-" || exit 1
+mmr review --base "$BASE_REF" --head "$BRANCH_NAME" --session "$SESSION_ID-cycle-$CYCLE" \
+  --round "$ROUND" --max-rounds 3 --sync --format json
 \`\`\`
 
 Append \`--fix-threshold P0|P1|P2|P3\` to any of the above to override the
 project's configured threshold for this invocation.
 
-Verdicts: proceed only on \`pass\` or \`degraded-pass\`. On \`blocked\` or
-\`needs-user-decision\`, stop and surface to the user. Fix all findings at or above
-\`results.fix_threshold\` before proceeding.
+Use at most three rounds per cycle. After each verified repair, increment
+\`ROUND\` and review the new exact head. If round three leaves a reproducible
+in-scope or required-safeguard defect, make a concrete repair, add focused
+regression proof, pass the required gate, increment \`CYCLE\`, reset \`ROUND\`
+to 1, and review again. Duplicate, stale, hypothetical, speculative, cosmetic,
+or already-dispositioned findings cannot start a new cycle. Never advance on a
+\`blocked\` or \`needs-user-decision\` result.
+
+Retry unchanged content after \`needs-user-decision\` only once at the same
+cycle and round. If that retry also misses the channel floor, record the channel
+failures and stop on the external dependency or missing credentials. Do not
+change product code, start a remediation cycle, or lower the floor for another
+identical-target attempt.
 
 **4th channel:** the Superpowers \`code-reviewer\` reconcile pass requires a
 harness that can dispatch agent skills. Codex cannot do this directly — for
@@ -109,15 +249,99 @@ PR_NUMBER="\${PR_NUMBER:-$(gh pr view --json number -q .number 2>/dev/null)}"
 if [ -z "$PR_NUMBER" ]; then
   echo "PR_NUMBER not set and no PR for current branch"; exit 1
 fi
-mmr review --pr "$PR_NUMBER" --sync --format json
+${CODEX_REPO_ID_SETUP}
+SESSION_ID="pr-$REPO_ID-$PR_NUMBER"
+CURRENT_HEAD=$(gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid) || exit 1
+REVIEW_ACTOR=$(gh api user --jq .login) || exit 1
+case "$REVIEW_ACTOR" in ''|*[!a-zA-Z0-9-]*) echo "Invalid GitHub actor" >&2; exit 1;; esac
+LEDGER_COMMENTS=$(gh api "repos/{owner}/{repo}/issues/$PR_NUMBER/comments?per_page=100" \
+  --paginate --jq '.[] | select(.user.login == "'"$REVIEW_ACTOR"'") | .body') || exit 1
+LAST_LEDGER=$(printf '%s\\n' "$LEDGER_COMMENTS" | sed -n '/<!-- mmr-cycle-ledger /p' | tail -1)
+MATCHING_HEAD_LEDGER=$(printf '%s\\n' "$LEDGER_COMMENTS" | \
+  sed -n "/<!-- mmr-cycle-ledger .* head=$CURRENT_HEAD /p" | tail -1)
+LAST_REVIEWED_HEAD=""; LAST_REVIEWED_VERDICT=""
+if [ -n "$LAST_LEDGER" ]; then
+  LEDGER_PATTERN='cycle=([1-9][0-9]*)[[:space:]]+round=([1-3])'
+  LEDGER_PATTERN+='[[:space:]]+head=([0-9a-f]{40,64})[[:space:]]+job=(mmr-[a-z0-9]+)'
+  LEDGER_PATTERN+='[[:space:]]+verdict=([^[:space:]]+)[[:space:]]+next_cycle=([1-9][0-9]*)'
+  LEDGER_PATTERN+='[[:space:]]+next_round=([1-3])'
+  if ! [[ "$LAST_LEDGER" =~ $LEDGER_PATTERN ]]; then
+    echo "Invalid MMR ledger marker; reconcile it before review." >&2; exit 1
+  fi
+  LAST_CYCLE="\${BASH_REMATCH[1]}"; LAST_ROUND="\${BASH_REMATCH[2]}"
+  LAST_REVIEWED_HEAD="\${BASH_REMATCH[3]}"; LAST_JOB="\${BASH_REMATCH[4]}"
+  LAST_REVIEWED_VERDICT="\${BASH_REMATCH[5]}"
+  if { [ -n "\${CYCLE+x}" ] || [ -n "\${ROUND+x}" ]; } \
+    && { [ "\${CYCLE:-}" != "\${BASH_REMATCH[6]}" ] || [ "\${ROUND:-}" != "\${BASH_REMATCH[7]}" ]; }; then
+    echo "CYCLE and ROUND disagree with the PR ledger marker." >&2; exit 1
+  fi
+  CYCLE="\${BASH_REMATCH[6]}"; ROUND="\${BASH_REMATCH[7]}"
+fi
+if [ -n "$MATCHING_HEAD_LEDGER" ] && { [ "$MATCHING_HEAD_LEDGER" != "$LAST_LEDGER" ] \
+  || [ "$LAST_REVIEWED_VERDICT" != "needs-user-decision" ]; }; then
+  echo "Current PR head already has an MMR ledger entry;" \
+    "disposition that job instead of dispatching a duplicate round." >&2
+  exit 1
+fi
+${CODEX_RESUME_SETUP}
+RETRY_SAME_ROUND=false
+[ "$LAST_REVIEWED_VERDICT" = "needs-user-decision" ] && RETRY_SAME_ROUND=true
+resolve_mmr_position "$SESSION_ID-cycle-" "$RETRY_SAME_ROUND" || exit 1
+if [ -z "$LAST_LEDGER" ] && [ -n "$RESOLVED_SESSION_JSON" ]; then
+  echo "MMR session history exists without a PR ledger marker; reconcile it before review." >&2; exit 1
+fi
+if [ -n "$LAST_LEDGER" ]; then
+  printf '%s' "$RESOLVED_SESSION_JSON" | node -e '
+const record = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+if (record.rounds !== Number(process.argv[1]) || record.jobs?.at(-1) !== process.argv[2]) process.exit(1);
+' "$LAST_ROUND" "$LAST_JOB" || {
+    echo "PR ledger and MMR session history disagree; reconcile them before review." >&2; exit 1
+  }
+fi
+MMR_EXIT=0
+MMR_RESULT=$(mmr review --pr "$PR_NUMBER" --session "$SESSION_ID-cycle-$CYCLE" \
+  --round "$ROUND" --max-rounds 3 --sync --format json) || MMR_EXIT=$?
+echo "$MMR_RESULT"
+[ "$MMR_EXIT" -eq 1 ] && exit 1
+REVIEW_TARGET=$(printf '%s' "$MMR_RESULT" | node -e '
+const result = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+const exactTarget = typeof result.review_target === "string"
+  && /@(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(result.review_target);
+if (!exactTarget) process.exit(1);
+process.stdout.write(result.review_target);
+') || { echo "MMR did not return a valid exact review_target." >&2; exit 1; }
+REVIEWED_HEAD=\${REVIEW_TARGET##*@}
+CURRENT_HEAD="$REVIEWED_HEAD"
+LATEST_HEAD=$(gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid) || exit 1
+if [ "$LATEST_HEAD" != "$CURRENT_HEAD" ]; then
+  echo "PR head changed after review; disposition this result, then review the new exact head before merge." >&2
+  exit 1
+fi
 \`\`\`
+
+After every completed call, classify and disposition every semantic finding,
+then use \`gh pr comment\` to post one evidence summary whose final line is:
+\`<!-- mmr-cycle-ledger cycle=<C> round=<R> head=<SHA> job=<ID> verdict=<V> next_cycle=<C> next_round=<R> -->\`.
+Only that authenticated review actor's markers are trusted on resume.
+Use the returned \`review_target\` for the marker, and re-read the PR head before
+merge. A changed head must complete its own bounded review.
 
 Append \`--fix-threshold P0|P1|P2|P3\` to override the project's configured
 threshold for this invocation.
 
-Verdicts: proceed only on \`pass\` or \`degraded-pass\`. On \`blocked\` or
-\`needs-user-decision\`, stop and surface to the user. Fix all findings at or above
-\`results.fix_threshold\` before proceeding.
+Use at most three rounds per cycle. After each verified repair, increment
+\`ROUND\` and review the new exact head. If round three leaves a reproducible
+in-scope or required-safeguard defect, make a concrete repair, add focused
+regression proof, pass the required gate, increment \`CYCLE\`, reset \`ROUND\`
+to 1, and review the same PR again. Duplicate, stale, hypothetical, speculative,
+cosmetic, or already-dispositioned findings cannot start a new cycle. Never
+advance on a \`blocked\` or \`needs-user-decision\` result.
+
+Retry unchanged content after \`needs-user-decision\` only once at the same
+cycle and round. If that retry also misses the channel floor, record the channel
+failures and stop on the external dependency or missing credentials. Do not
+change product code, start a remediation cycle, or lower the floor for another
+identical-target attempt.
 
 **4th channel:** the Superpowers \`code-reviewer\` reconcile pass requires a
 harness that can dispatch agent skills. Codex cannot do this directly — for

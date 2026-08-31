@@ -152,7 +152,7 @@ describe('mmr review trust-boundary integration', () => {
       expect(output?.trust_mode).toBe('base-ref')
       expect(output?.verdict).toBe('needs-user-decision')
       expect(output?.proposed_acks).toHaveLength(1)
-      expect(exited).toBe(2)
+      expect(exited).toBe(3)
     } finally {
       fs.rmSync(dir, { recursive: true, force: true })
       fs.rmSync(home, { recursive: true, force: true })
@@ -189,11 +189,11 @@ describe('mmr review trust-boundary integration', () => {
       // Default (no --sync): the gate must still fire.
       const noSync = await runReview({ diff: diffFile, base: 'HEAD', sync: false }, { cwd: dir, home })
       expect(noSync.output?.verdict).toBe('needs-user-decision')
-      expect(noSync.exited).toBe(2)
+      expect(noSync.exited).toBe(3)
       // --dry-run: the gate must still fire (not just preview).
       const dryRun = await runReview({ diff: diffFile, base: 'HEAD', 'dry-run': true }, { cwd: dir, home })
       expect(dryRun.output?.verdict).toBe('needs-user-decision')
-      expect(dryRun.exited).toBe(2)
+      expect(dryRun.exited).toBe(3)
     } finally {
       fs.rmSync(dir, { recursive: true, force: true })
       fs.rmSync(home, { recursive: true, force: true })

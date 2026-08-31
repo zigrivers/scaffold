@@ -62,6 +62,8 @@ export interface ReconciledFinding extends Finding {
   /** True when this finding has been silenced via `mmr ack` (T2-D). */
   acknowledged?: boolean
   ack_reason?: string
+  /** Scope that supplied the acknowledgment, retained for auditability. */
+  ack_scope?: 'project' | 'user' | 'job'
   /** How the ack was resolved: exact key match or location-anchored Jaccard fallback. */
   ack_match?: 'exact' | 'fuzzy'
   /** Reserved for T2-C (v3.31): finding was auto-downgraded after repeat threshold. */
@@ -106,6 +108,8 @@ export interface JobMetadata {
   session_id?: string
   /** One-based round counter within a session (T2-B). */
   round?: number
+  /** Exact review target, such as a PR URL plus head object ID. */
+  review_target?: string
   /** Parsed review loop/security controls used for this invocation. */
   review_controls?: ReviewControls
   /**
@@ -132,6 +136,8 @@ export interface ChannelJobEntry {
 
 export interface ReconciledResults {
   job_id: string
+  /** Exact target whose diff produced this result. */
+  review_target?: string
   verdict: Verdict
   fix_threshold: Severity
   advisory_count: number
@@ -143,6 +149,8 @@ export interface ReconciledResults {
     channels_dispatched: number
     channels_completed: number
     channels_partial: number
+    /** Number of visible findings dispositioned through acknowledgments. */
+    acknowledged_findings?: number
     total_elapsed: string
   }
   /** Trust mode under which this review ran (§5 decision 1). */

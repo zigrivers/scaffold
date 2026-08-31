@@ -55,6 +55,30 @@ The verdict also reflects **how many channels reported**: fewer than
 `needs-user-decision` even with zero findings — one reviewer is not multi-model
 review. Treat that as "fix the channels" (`mmr doctor`), not as a pass.
 
+## Bounded remediation cycles
+
+Use a maximum of three rounds per review cycle. If round three confirms a
+reproducible defect within the original acceptance criteria or a required
+safeguard, make a concrete repair, add focused regression proof, pass the
+required gate, then start a new bounded cycle on the same PR. Reset to round one
+and review the new exact head under a new session id.
+On resume, recover the active cycle and round from the PR disposition ledger and
+MMR session history; use cycle one only when neither records a prior review.
+
+Duplicate, stale, hypothetical, speculative, cosmetic, or already-dispositioned
+findings cannot start a new cycle. Continue without owner approval until every
+finding has a finite disposition and no verified blocker remains. Stop when the
+user asks to stop; otherwise stop only for an external dependency, missing
+credentials or authority, a destructive action, an out-of-scope material
+product decision, or a demonstrated technical plateau. An unresolved required
+safeguard is not a plateau.
+
+For a verified refutation, duplicate, or stale finding that still blocks the
+verdict, record the evidence in the review ledger, run `mmr ack add <finding-key>
+--job <id> --scope job --reason "reject: <evidence>"`, then recompute with `mmr
+results <id>`. The disposition applies only to that immutable review job. Never
+acknowledge a verified `fix-now`, `block`, or required-safeguard defect.
+
 ## Async flow (without `--sync`)
 
 `mmr review …` prints a job id → `mmr status <job-id>` until complete →
@@ -110,8 +134,9 @@ If a channel reports an auth failure, follow the recovery line in the output
 
 ## Common workflows
 
-**After creating a PR** — run `mmr review --pr <number>`, note the job id, keep
-working, poll `mmr status <job-id>` until channels complete, collect with
+**After creating a PR** — run `mmr review --pr <number> --session
+pr-<repo-id>-<number>-cycle-<cycle> --round <round> --max-rounds 3`, note the
+job id, keep working, poll `mmr status <job-id>` until channels complete, collect with
 `mmr results <job-id>`, then fix findings at or above the threshold (or merge if
 the gate passed).
 
@@ -133,7 +158,7 @@ targets the wrappers don't cover (docs, arbitrary diffs, ref ranges).
 mmr jobs list                          # recent review/critique jobs (also: prune)
 mmr status <job-id>                    # one job's per-channel progress
 mmr results <job-id> --format json     # reconciled findings (also text | markdown)
-mmr ack add <finding-key> --job <id>   # acknowledge a finding (also: list, rm, prune)
+mmr ack add <finding-key> --job <id> --scope job --reason "reject: <evidence>"
 mmr reconcile <job-id> --channel superpowers --input findings.json
 mmr sessions list                      # iterative sessions (also: start | show | end)
 ```

@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Changed
+
+- The pre-dispatch config/ack trust gate now exits 3
+  (`needs-user-decision`) instead of 2 (`blocked`), matching the verdict and
+  the documented exit-code contract.
+- Session jobs now persist a PR URL plus exact head object ID. Duplicate
+  suppression still blocks a repeated exact head, but no longer mistakes an
+  unchanged patch on a rebased head for an already-reviewed target. Dry runs
+  remain non-dispatching previews and do not consume duplicate-target state.
+
 ### Removed
 
 - **`stage: prototype | mvp | production` is withdrawn before ever shipping.**
@@ -55,6 +65,11 @@
   target there was no noise to reduce.
 
 ### Added
+
+- **Job-scoped review dispositions.** `mmr ack add <key> --job <id> --scope
+  job --reason "reject: <evidence>"` stores an exact-match acknowledgment inside
+  one immutable review job. It cannot suppress a similar finding in another
+  review or repository, and the job scope requires both the job id and reason.
 
 - **The finding-quality harness can now compare two MMR builds** (`scripts/`,
   not shipped in the published package). Its only treatment mechanism was a

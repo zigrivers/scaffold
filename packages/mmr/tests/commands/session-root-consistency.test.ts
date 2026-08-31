@@ -159,6 +159,7 @@ describe('review — reserved session id is rejected before any job is created',
       return {
         ...actual,
         getSessionStore: () => ({
+          withFamilyLock: (_id: string, fn: () => unknown) => fn(),
           show: () => undefined,
           start: () => undefined,
           addJob: () => {

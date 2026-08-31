@@ -17,9 +17,9 @@ set identity once, then repeat up to N times (one bead in flight per agent):
   refresh view -> select ONE bead -> claim atomically, then validate (lost the
   claim? next candidate; dup/conflict? cooldown-release + next) -> worktree
   -> build (draft PR on first push; renew lease on each push)
-  -> verify (make check-affected) -> review (mmr, 3-round cap)
+  -> verify (make check-affected) -> review (mmr, max 3 rounds per cycle)
   -> enqueue (make mq-enqueue) and move on -> daemon lands + closes the bead
-batch end (budget spent, queue drained, or P0/blocker): report in the slots
+batch end (budget spent, queue drained, or an external stop): report in the slots
 ```
 
 **The agent's finish line is a green gate + passing review + the PR ENQUEUED** —
@@ -28,8 +28,21 @@ merge or `bd close` an enqueued bead yourself. (No merge queue installed? Land
 via the serialized merge slot instead — same finish line, you just do the
 merge.) Standing authorization: run the whole loop without asking permission. Do
 not end your turn after opening a draft PR with a list of "next steps" — that is
-the #1 observed agent failure. The only mid-loop stops: a verified,
-still-reproducing P0, or a blocker you can name.
+the #1 observed agent failure. Stop when the user asks to stop. Otherwise, the
+only mid-loop stops are a true external dependency, missing credentials or
+authority, a destructive action, a material product decision outside the
+acceptance criteria, or a demonstrated technical plateau after safe approaches
+are exhausted. An unresolved required-safeguard defect is not a plateau; an
+in-scope blocker starts or continues remediation.
+
+Each review cycle has at most three rounds. A genuine round-three in-scope or
+required-safeguard blocker starts a new cycle only after a concrete repair,
+focused regression proof, and the required gate; review the new exact head from
+round one. Duplicate, stale, hypothetical, speculative, cosmetic, and already-
+dispositioned findings cannot restart review. No owner approval is required for
+in-scope remediation. Merge only when the final exact head meets the channel
+floor, all required gates pass, every finding is dispositioned, and no verified
+blocker remains.
 
 Invocation: `/work-beads` (1 bead) · `/work-beads N` (up to N beads, selected
 **one at a time at claim time** — N is a budget, not a reservation; never
@@ -347,13 +360,14 @@ hook; the cadence is the host's to bind.)*
 every stale doc in this same PR. Check the project-invariants section of
 AGENTS.md (if the project defines one) before shipping.
 
-**2.5 Deliberate scope deferral = bead.** File a bead only when the task owner
-(the user or designated owner, not the working agent acting alone) explicitly
-removes work from the current acceptance criteria or a verified defect outside
-the PR's required scope will not be fixed here, and only when that work passes
-all five follow-up gates in 2.7. A verified defect inside required scope is
-`fix-now` or `block`, never a follow-up. Suggestions, severity labels, and
+**2.5 Deliberate scope deferral = bead.** The acting agent may use evidence and
+the original acceptance criteria to decide whether a verified defect is inside
+the PR's required scope. File a bead only when the task owner explicitly removes
+work from that scope or a verified defect is outside it, and only when the work
+passes all five follow-up gates in 2.7. A verified defect inside required scope
+is `fix-now` or `block`, never a follow-up. Suggestions, severity labels, and
 unsupported or low-value findings do not create beads.
+Review-origin work must not create recursive follow-up beads.
 
 ```bash
 bd create "<imperative title>" -t task -p 2 --deps discovered-from:<id> \
@@ -375,7 +389,7 @@ prune`. Long local test loops run at reduced priority so the merge lane stays
 fast on a saturated machine: `taskpolicy -c utility make check-affected`
 (macOS; skip the wrapper where `taskpolicy` is absent).
 
-**2.7 Review and merge:** `mmr review --pr <N> --sync --format json`.
+**2.7 Review and merge:** `mmr review --pr <N> --session pr-<repo-id>-<N>-cycle-<C> --round <R> --max-rounds 3 --sync --format json`.
 - Check the diff is uncontaminated first: `gh pr diff <N> --name-only` shows
   only your intended surface.
 - Surface channel auth failures to the user with recovery commands; never
@@ -387,24 +401,37 @@ fast on a saturated machine: `taskpolicy -c utility make check-affected`
   product safeguard required by project instructions.
 - Group repeated findings by root cause. Record exactly one finite disposition:
   `fix-now`, `block`, `reject:<reason>`, or `follow-up:<bead-id>`.
+- If a verified `reject:<reason>` still blocks MMR, copy the evidence to the PR
+  ledger, run `mmr ack add <finding-key> --job <job-id> --scope job --reason
+  "reject: <evidence>"`, then recompute with `mmr results <job-id>`. Never
+  acknowledge a verified `fix-now` or `block`.
 - A model's severity label never creates a bead. Create one follow-up per root cause
   only when the finding is reproducible, actionable, non-duplicate, worth scheduling,
   and outside the PR's required scope.
 - Round 1 verifies root causes and fixes required defects. Rounds 2–3 review new
   changes and collapse repeats into the existing dispositions.
-- Hard cap: 3 rounds. Review stops when every root cause has a disposition and
-  no verified fix-now or block item remains. Do not rerun review merely to
-  clear suggestions, and do not create tasks from review-task review metadata.
-- A verified block ends review immediately. Keep the PR open, post the
-  disposition ledger and reproduction, notify the user, and end the batch
-  without merging; do not spend the remaining review rounds.
-- Review always ends after round 3. At the cap, if a verified fix-now item
-  remains, keep the PR open, post the ledger and reproduction, notify the user,
-  and end the batch without merging. Otherwise proceed once all required checks
-  pass.
+- Hard cap: a maximum of three rounds per review cycle. Review stops when every
+  root cause has a disposition and no verified fix-now or block item remains.
+  Do not rerun review merely to clear suggestions or obtain a cosmetically clean
+  response.
+- If round three finds a reproducible acceptance-criteria or required-safeguard
+  defect, make a concrete repair, add or update focused regression proof, rerun
+  the required gate, then start a new bounded cycle on the same PR. Reset to
+  round one and review the new exact head. No owner approval is required for
+  this in-scope remediation.
+- Duplicate, stale, hypothetical, speculative, cosmetic, or already-dispositioned
+  findings cannot start a new cycle. Collapse repeats into the existing ledger.
 - A verified acceptance-criteria or mandatory-guardrail defect blocks merge
   regardless of its model-assigned severity. A follow-up bead cannot make the
   current PR safe.
+- Stop when the user asks to stop. Otherwise stop only for a true external
+  dependency, missing credentials or authority, a destructive action, a material
+  product decision outside the acceptance criteria, or a demonstrated technical
+  plateau after safe approaches are exhausted. Record exact evidence. An
+  unresolved required safeguard is not a plateau; continue repairing it.
+- Merge only when the final exact head has completed the configured MMR channel
+  floor, required gates are green, every finding is dispositioned, and no
+  verified blocker remains.
 - **Merge queue installed** (`scripts/mq-guard.sh` exists — the
   merge-throughput step installs it): after the review passes, tear down
   staging first if you brought a stack up this bead (from INSIDE the worktree:
@@ -482,7 +509,7 @@ If the batch ran long and `launchpad` is installed: `launchpad notify "<summary>
 | Leave work accepted for follow-up under 2.5 as a TODO/FIXME comment | That work is a bead, filed now |
 | File a bead because a reviewer called something P2/P3 | Severity is not task authority; apply all five gates in 2.7 |
 | Merge with a red `make check` or a required defect | Fix or block; a future bead cannot make the current PR safe |
-| Chase a clean review past round 3 | Stop dispatching review; merge only when every root cause has a disposition and no verified fix-now or block item remains |
+| Chase a cosmetically clean review | Stop dispatching once every root cause has a disposition and no verified fix-now or block item remains; a real repaired blocker starts a fresh bounded cycle |
 | Leave a staging stack you started running | `make staging-down` from the worktree before merging (only if you ran `staging-up`; never from the primary — it refuses there, and `prune-merged` reclaims it too) |
 | `--no-verify`, plain `--force`, merge commits | Forbidden; `--force-with-lease` after rebase only |
 | Close the bead when the PR opens | Close only after MERGED + verified |
