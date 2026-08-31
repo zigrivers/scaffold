@@ -4,6 +4,8 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+## [3.54.2] - 2026-08-31
+
 ### Changed
 
 - **In-scope review remediation is now autonomous.** MMR remains capped at

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [4.0.2] — 2026-08-31
+
 ### Changed
 
 - The pre-dispatch config/ack trust gate now exits 3
@@ -119,6 +121,8 @@
 
 ### Fixed
 
+- `mmr --version` now reads MMR's own package version instead of inheriting the
+  hosting workspace's package version from yargs' ESM auto-detection.
 - **Documented that `review_criteria` is trust-gated and fails silently.**
   `mmr review --diff …` classifies as `untrusted-head`, so the project
   `.mmr.yaml` is never read and any configured criteria are dropped with no
