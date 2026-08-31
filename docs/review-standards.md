@@ -79,6 +79,13 @@ evidence for the stop. Required
 safeguards include security, privacy, and data integrity, plus accessibility and
 every repository or product safeguard named by project instructions.
 
+An unchanged exact target gets at most one same-round retry after
+`needs-user-decision`. If that retry also cannot meet the channel floor, record
+the channel failures and stop on the external dependency or missing credentials.
+Do not start a remediation cycle, change product code, or lower the floor merely
+to retry identical content. A verified blocker still outranks the channel floor
+and follows the repair rule above.
+
 ## Verify, don't dismiss
 
 Treat every finding as real until you have verified otherwise in the code. A

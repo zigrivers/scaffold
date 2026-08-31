@@ -48,8 +48,8 @@ const CODEX_REPO_ID_SETUP = `REPO_ID=$(
 )`
 
 const CODEX_RESUME_SETUP = `resolve_mmr_position() {
-  local session_prefix="$1" retry_same_round="\${2:-false}"
-  local latest_cycle session_json recorded_rounds override=false
+  local session_prefix="$1" retry_same_round="\${2:-auto}"
+  local session_list latest_cycle session_json recorded_rounds override=false
   RESOLVED_SESSION_JSON=""
 
   if [ -n "\${CYCLE+x}" ] || [ -n "\${ROUND+x}" ]; then
@@ -64,7 +64,10 @@ const CODEX_RESUME_SETUP = `resolve_mmr_position() {
     override=true
   fi
 
-  latest_cycle=$(mmr sessions list | node -e '
+  session_list=$(mmr sessions list) || {
+    echo "Cannot read MMR session history; repair it before review." >&2; return 1
+  }
+  latest_cycle=$(printf '%s' "$session_list" | node -e '
 const sessions = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
 const prefix = process.argv[1];
 const cycles = sessions.map(({ session_id }) =>
@@ -90,6 +93,28 @@ if (!Number.isInteger(record.rounds) || record.rounds < 0 || record.rounds > 3) 
 process.stdout.write(String(record.rounds));
 ') || { echo "Invalid MMR session record; reconcile it before review." >&2; return 1; }
 
+  if [ "$retry_same_round" = auto ]; then
+    local latest_job prior_result prior_status=0 prior_verdict
+    latest_job=$(printf '%s' "$session_json" | node -e '
+const record = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+const job = record.jobs?.at(-1);
+if (job !== undefined) process.stdout.write(String(job));
+') || { echo "Invalid MMR session record; reconcile it before review." >&2; return 1; }
+    retry_same_round=false
+    if [ -n "$latest_job" ]; then
+      prior_result=$(mmr results "$latest_job" --format json) || prior_status=$?
+      if [ "$prior_status" -ne 0 ] && [ "$prior_status" -ne 2 ] && [ "$prior_status" -ne 3 ]; then
+        echo "Cannot read the latest MMR verdict; reconcile it before review." >&2; return 1
+      fi
+      prior_verdict=$(printf '%s' "$prior_result" | node -e '
+const result = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+if (!["pass", "degraded-pass", "blocked", "needs-user-decision"].includes(result.verdict)) process.exit(1);
+process.stdout.write(result.verdict);
+') || { echo "Invalid latest MMR verdict; reconcile it before review." >&2; return 1; }
+      [ "$prior_verdict" = "needs-user-decision" ] && retry_same_round=true
+    fi
+  fi
+
   if [ "$override" = true ]; then
     if [ "$retry_same_round" = true ] && [ "$CYCLE" -eq "$latest_cycle" ] \
       && [ "$ROUND" -eq "$recorded_rounds" ]; then
@@ -113,7 +138,9 @@ process.stdout.write(String(record.rounds));
     return 1
   fi
   CYCLE="$latest_cycle"
-  ROUND="$((recorded_rounds + 1))"
+  if [ "$retry_same_round" = true ]; then ROUND="$recorded_rounds"
+  else ROUND="$((recorded_rounds + 1))"
+  fi
 }`
 
 const CODEX_EXECUTOR_RECIPES: Record<string, string> = {
@@ -193,6 +220,12 @@ to 1, and review again. Duplicate, stale, hypothetical, speculative, cosmetic,
 or already-dispositioned findings cannot start a new cycle. Never advance on a
 \`blocked\` or \`needs-user-decision\` result.
 
+Retry unchanged content after \`needs-user-decision\` only once at the same
+cycle and round. If that retry also misses the channel floor, record the channel
+failures and stop on the external dependency or missing credentials. Do not
+change product code, start a remediation cycle, or lower the floor for another
+identical-target attempt.
+
 **4th channel:** the Superpowers \`code-reviewer\` reconcile pass requires a
 harness that can dispatch agent skills. Codex cannot do this directly — for
 4-channel coverage, run \`scaffold run review-code\` from a Claude Code session
@@ -212,8 +245,8 @@ SESSION_ID="pr-$REPO_ID-$PR_NUMBER"
 CURRENT_HEAD=$(gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid) || exit 1
 REVIEW_ACTOR=$(gh api user --jq .login) || exit 1
 case "$REVIEW_ACTOR" in ''|*[!a-zA-Z0-9-]*) echo "Invalid GitHub actor" >&2; exit 1;; esac
-LEDGER_COMMENTS=$(gh pr view "$PR_NUMBER" --json comments \
-  --jq '.comments[] | select(.author.login == "'"$REVIEW_ACTOR"'") | .body') || exit 1
+LEDGER_COMMENTS=$(gh api "repos/{owner}/{repo}/issues/$PR_NUMBER/comments?per_page=100" \
+  --paginate --jq '.[] | select(.user.login == "'"$REVIEW_ACTOR"'") | .body') || exit 1
 LAST_LEDGER=$(printf '%s\\n' "$LEDGER_COMMENTS" | sed -n '/<!-- mmr-cycle-ledger /p' | tail -1)
 MATCHING_HEAD_LEDGER=$(printf '%s\\n' "$LEDGER_COMMENTS" | \
   sed -n "/<!-- mmr-cycle-ledger .* head=$CURRENT_HEAD /p" | tail -1)
@@ -274,6 +307,12 @@ regression proof, pass the required gate, increment \`CYCLE\`, reset \`ROUND\`
 to 1, and review the same PR again. Duplicate, stale, hypothetical, speculative,
 cosmetic, or already-dispositioned findings cannot start a new cycle. Never
 advance on a \`blocked\` or \`needs-user-decision\` result.
+
+Retry unchanged content after \`needs-user-decision\` only once at the same
+cycle and round. If that retry also misses the channel floor, record the channel
+failures and stop on the external dependency or missing credentials. Do not
+change product code, start a remediation cycle, or lower the floor for another
+identical-target attempt.
 
 **4th channel:** the Superpowers \`code-reviewer\` reconcile pass requires a
 harness that can dispatch agent skills. Codex cannot do this directly — for

@@ -240,7 +240,8 @@ describe('CodexAdapter', () => {
       expect(content).toContain('REPO_ID=$(')
       expect(content).toMatch(/already has an MMR ledger entry/i)
       expect(content).toContain('gh api user')
-      expect(content).toContain('author.login')
+      expect(content).toContain('user.login')
+      expect(content).toContain('--paginate')
       expect(content).toContain('gh pr comment')
       expect(content).toContain('[0-9a-f]{40,64}')
       expect(content).toContain('--round "$ROUND" --max-rounds 3')
@@ -264,7 +265,9 @@ describe('CodexAdapter', () => {
 
       const script = `
 mmr() {
-  if [ "$1 $2" = "sessions list" ]; then printf '%s' "$MMR_SESSIONS" | sed "s/__REPO_ID__/$REPO_ID/g"
+  if [ "$1 $2" = "sessions list" ]; then
+    printf '%s' "$MMR_SESSIONS" | sed "s/__REPO_ID__/$REPO_ID/g"
+    [ "$MMR_LIST_FAIL" != "true" ]
   elif [ "$1 $2" = "sessions show" ]; then printf '%s' "$MMR_SESSION" | sed "s/__REPO_ID__/$REPO_ID/g"
   elif [ "$1" = "review" ]; then printf 'REVIEW %s\\n' "$*"
   else return 1
@@ -273,7 +276,10 @@ mmr() {
 gh() {
   if [[ "$*" == "api user --jq .login" ]]; then printf '%s\\n' 'review-actor'
   elif [[ "$*" == *"--json headRefOid"* ]]; then printf '%s\\n' "$CURRENT_HEAD"
-  elif [[ "$*" == *"--json comments"* ]]; then printf '%s\\n' "$LEDGER_COMMENTS"
+  elif [[ "$*" == *"/issues/42/comments"* && "$*" == *"--paginate"* ]]; then
+    printf '%s\\n' "$LEDGER_COMMENTS"
+  elif [[ "$*" == *"--json comments"* && "$REQUIRE_PAGINATED_COMMENTS" != "true" ]]; then
+    printf '%s\\n' "$LEDGER_COMMENTS"
   else return 1
   fi
 }
@@ -301,7 +307,7 @@ ${recipe}
           'head=0000000000000000000000000000000000000000 job=mmr-prev ' +
           'verdict=blocked next_cycle=2 next_round=2 -->' },
       )
-      expect(resumed.status).toBe(0)
+      expect(resumed.status, resumed.stderr).toBe(0)
       expect(resumed.stdout).toMatch(/--session pr-[0-9a-f]{12}-42-cycle-2 --round 2 --max-rounds 3/)
 
       const capped = run(
@@ -385,7 +391,15 @@ ${recipe}
         },
       )
       expect(recoverableHead.status).toBe(0)
-      expect(recoverableHead.stdout).toContain('REVIEW')
+      expect(recoverableHead.stdout).toMatch(/REVIEW .*--round 1 --max-rounds 3/)
+
+      const failedSessionList = run('[]', '{}', { MMR_LIST_FAIL: 'true' })
+      expect(failedSessionList.status).toBe(1)
+      expect(failedSessionList.stdout).not.toContain('REVIEW')
+
+      const paginatedLedger = run('[]', '{}', { REQUIRE_PAGINATED_COMMENTS: 'true' })
+      expect(paginatedLedger.status).toBe(0)
+      expect(paginatedLedger.stdout).toContain('REVIEW')
 
       const ledgerMismatch = run(
         JSON.stringify([{ session_id: 'pr-__REPO_ID__-42-cycle-1', rounds: 1, jobs: ['mmr-other'] }]),
@@ -400,6 +414,50 @@ ${recipe}
       expect(ledgerMismatch.status).toBe(1)
       expect(ledgerMismatch.stderr).toMatch(/ledger and MMR session history disagree/i)
       expect(ledgerMismatch.stdout).not.toContain('REVIEW')
+    })
+
+    it('review-code retries an inconclusive unchanged target at the recorded round', () => {
+      adapter.initialize(makeContext())
+      adapter.generateStepWrapper(makeStepInput({ slug: 'review-code', phase: null }))
+      const content = adapter.finalize(makeFinalizeInput([])).files[0].content
+      const modeTwo = content.match(/\*\*Mode 2[^`]*```bash\n([\s\S]*?)\n```/)?.[1]
+      expect(modeTwo).toBeDefined()
+
+      const script = `
+mmr() {
+  if [ "$1 $2" = "sessions list" ]; then
+    printf '%s' "$MMR_SESSIONS" | sed "s/__REPO_ID__/$REPO_ID/g"
+  elif [ "$1 $2" = "sessions show" ]; then
+    printf '%s' "$MMR_SESSION" | sed "s/__REPO_ID__/$REPO_ID/g"
+  elif [ "$1" = "results" ]; then
+    printf '%s' '{"verdict":"needs-user-decision"}'
+    return 3
+  elif [ "$1" = "review" ]; then printf 'REVIEW %s\\n' "$*"
+  else return 1
+  fi
+}
+${modeTwo}
+`
+      const result = spawnSync('/bin/bash', ['-c', script], {
+        encoding: 'utf8',
+        cwd: process.cwd(),
+        env: {
+          ...process.env,
+          MMR_SESSIONS: JSON.stringify([{
+            session_id: 'local-staged-__REPO_ID__-fix-autonomous-review-cycles-cycle-1',
+            rounds: 1,
+            jobs: ['mmr-prior'],
+          }]),
+          MMR_SESSION: JSON.stringify({
+            session_id: 'local-staged-__REPO_ID__-fix-autonomous-review-cycles-cycle-1',
+            rounds: 1,
+            jobs: ['mmr-prior'],
+          }),
+        },
+      })
+
+      expect(result.status, result.stderr).toBe(0)
+      expect(result.stdout).toMatch(/REVIEW .*--round 1 --max-rounds 3/)
     })
 
     it('non-executor tools still use `scaffold run <slug>`', () => {

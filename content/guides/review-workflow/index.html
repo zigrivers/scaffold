@@ -1576,6 +1576,12 @@ plateau after safe approaches are exhausted. Record exact evidence. An
 unresolved required safeguard is not a plateau; continue repairing it. Required
 safeguards include security, privacy, accessibility, data integrity, and
 project-specific product protections.</p>
+<p>An unchanged exact target gets at most one same-round retry after
+<code>needs-user-decision</code>. If that retry also cannot meet the channel floor, record
+the channel failures and stop on the external dependency or missing credentials.
+Do not start a remediation cycle, change product code, or lower the floor merely
+to retry identical content. A verified blocker still outranks the channel floor
+and follows the repair rule above.</p>
 <p>Merge only when the final exact head has completed the configured MMR channel
 floor, required gates are green, every finding is dispositioned, and no
 verified blocker remains <span class="fp" data-path="content/tools/review-pr.md:207">content/tools/review-pr.md:207</span>.</p>

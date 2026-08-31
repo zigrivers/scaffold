@@ -106,6 +106,9 @@ SESSION_ID="local-$SCOPE_ID-$REPO_ID-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_
 # On resume, run `mmr sessions list`, select the highest numeric cycle for the
 # exact `$SESSION_ID-cycle-` prefix, and confirm it with
 # `mmr sessions show "$SESSION_ID-cycle-$CYCLE"`.
+# Read the latest job with `mmr results`. If its verdict is
+# `needs-user-decision`, reuse the recorded round for the one permitted
+# same-round retry instead of incrementing it.
 # If the recorded round is 3, do not increment it; advance to a new cycle at
 # round 1 only after Step 4's concrete repair and gate. Otherwise set ROUND to
 # the recorded `rounds` plus one. If the record is missing or inconsistent, do not start another review;
@@ -210,6 +213,12 @@ concrete repair, focused regression proof, and the required gate pass. Increment
 Duplicate, stale, hypothetical, speculative, cosmetic, or already-dispositioned
 findings cannot start a new cycle. Do not dispatch extra rounds for a
 cosmetically clean model response.
+
+For unchanged content, retry `needs-user-decision` only once at the same cycle
+and round. If the retry also misses the channel floor, record the channel
+failures and stop on that external dependency or missing credentials. Do not
+edit product code, start a remediation cycle, or lower the floor to obtain
+another identical-target attempt.
 
 If a verified `reject:<reason>` still blocks MMR, record the evidence, run `mmr
 ack add <finding-key> --job <job-id> --scope job --reason "reject: <evidence>"`,

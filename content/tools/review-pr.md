@@ -76,7 +76,7 @@ cycle uses a new session id on the same PR (Step 4).
 ```bash
 # After every round, append one PR comment marker with the finite dispositions:
 # <!-- mmr-cycle-ledger cycle=<C> round=<R> head=<SHA> job=<ID> verdict=<V> next_cycle=<C> next_round=<R> -->
-# On resume, read markers with `gh pr view "$PR_NUMBER" --json comments`, select
+# On resume, read every marker with the paginated issue-comments API, select
 # the highest cycle and round, then cross-check it with MMR session history from `mmr sessions list` and
 # `mmr sessions show "$SESSION_ID-cycle-$LAST_CYCLE"`. The session's `rounds`
 # and final job must match the marker. Recover CYCLE and ROUND from next_cycle
@@ -91,8 +91,8 @@ SESSION_ID="pr-$REPO_ID-$PR_NUMBER"
 CURRENT_HEAD=$(gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid) || exit 1
 REVIEW_ACTOR=$(gh api user --jq .login) || exit 1
 case "$REVIEW_ACTOR" in ''|*[!a-zA-Z0-9-]*) echo "Invalid GitHub actor" >&2; exit 1;; esac
-LEDGER_COMMENTS=$(gh pr view "$PR_NUMBER" --json comments \
-  --jq '.comments[] | select(.author.login == "'"$REVIEW_ACTOR"'") | .body') || exit 1
+LEDGER_COMMENTS=$(gh api "repos/{owner}/{repo}/issues/$PR_NUMBER/comments?per_page=100" \
+  --paginate --jq '.[] | select(.user.login == "'"$REVIEW_ACTOR"'") | .body') || exit 1
 LAST_LEDGER=$(printf '%s\n' "$LEDGER_COMMENTS" | sed -n '/<!-- mmr-cycle-ledger /p' | tail -1)
 MATCHING_HEAD_LEDGER=$(printf '%s\n' "$LEDGER_COMMENTS" |
   sed -n "/<!-- mmr-cycle-ledger .* head=$CURRENT_HEAD /p" | tail -1)
@@ -176,6 +176,12 @@ concrete repair, focused regression proof, and the required gate pass. Increment
 stale, hypothetical, speculative, cosmetic, or already-dispositioned findings
 cannot start a new cycle. Do not run extra rounds to obtain a cosmetically clean
 response.
+
+For unchanged content, retry `needs-user-decision` only once at the same cycle
+and round. If the retry also misses the channel floor, record the channel
+failures and stop on that external dependency or missing credentials. Do not
+edit product code, start a remediation cycle, or lower the floor to obtain
+another identical-target attempt.
 
 Use evidence to reproduce, refute, deduplicate, classify, and disposition every
 finding; a model's severity label alone does not decide. If a verified
