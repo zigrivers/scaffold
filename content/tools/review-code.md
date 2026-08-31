@@ -97,7 +97,12 @@ REPO_ID=$(
   (git config --get remote.origin.url 2>/dev/null || git rev-parse --show-toplevel) |
     git hash-object --stdin | cut -c1-12
 )
-SESSION_ID="local-$REVIEW_SCOPE-$REPO_ID-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
+SCOPE_ID="$REVIEW_SCOPE"
+if [ "$REVIEW_SCOPE" = "range" ]; then
+  BASE_ID=$(printf '%s' "$BASE_REF" | git hash-object --stdin | cut -c1-12)
+  SCOPE_ID="range-$BASE_ID"
+fi
+SESSION_ID="local-$SCOPE_ID-$REPO_ID-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
 # On resume, run `mmr sessions list`, select the highest numeric cycle for the
 # exact `$SESSION_ID-cycle-` prefix, and confirm it with
 # `mmr sessions show "$SESSION_ID-cycle-$CYCLE"`. Set ROUND to the recorded

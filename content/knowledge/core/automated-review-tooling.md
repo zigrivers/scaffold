@@ -51,9 +51,9 @@ These are the authoritative verdict definitions. Tool files (`review-code.md`, `
 | `pass` | All channels completed, no unresolved findings at or above `fix_threshold` |
 | `degraded-pass` | Some channels unavailable, compensating passes ran, no unresolved findings at or above `fix_threshold` |
 | `blocked` | Findings at or above fix threshold remain unresolved |
-| `needs-user-decision` | No channels completed — insufficient data for a determination |
+| `needs-user-decision` | No channels completed, or fewer than the configured channel floor completed without a blocker |
 
-**Verdict precedence:** `needs-user-decision` > `blocked` > `degraded-pass` > `pass`. When multiple conditions apply, the higher-precedence verdict wins.
+**Verdict precedence:** pre-dispatch trust and round gates run first; after dispatch, `blocked` > `needs-user-decision` > `degraded-pass` > `pass`. When multiple post-dispatch conditions apply, the higher-precedence verdict wins.
 
 **Both external channels missing:** Maximum achievable verdict is `degraded-pass` — never `pass`. Review summary must note: "All findings are single-model (Claude only). External validation was unavailable."
 

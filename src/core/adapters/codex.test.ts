@@ -237,6 +237,9 @@ describe('CodexAdapter', () => {
       expect(content).toContain('--session "$SESSION_ID-cycle-$CYCLE"')
       expect(content).toContain('REPO_ID=$(')
       expect(content).toMatch(/already has an MMR ledger entry/i)
+      expect(content).toContain('gh api user')
+      expect(content).toContain('author.login')
+      expect(content).toContain('gh pr comment')
       expect(content).toContain('--round "$ROUND" --max-rounds 3')
       expect(content).toContain('mmr sessions list')
       expect(content).toContain('mmr sessions show')
@@ -265,7 +268,8 @@ mmr() {
   fi
 }
 gh() {
-  if [[ "$*" == *"--json headRefOid"* ]]; then printf '%s\\n' "$CURRENT_HEAD"
+  if [[ "$*" == "api user --jq .login" ]]; then printf '%s\\n' 'review-actor'
+  elif [[ "$*" == *"--json headRefOid"* ]]; then printf '%s\\n' "$CURRENT_HEAD"
   elif [[ "$*" == *"--json comments"* ]]; then printf '%s\\n' "$LEDGER_COMMENTS"
   else return 1
   fi
@@ -327,6 +331,15 @@ ${recipe}
       expect(duplicateHead.status).toBe(1)
       expect(duplicateHead.stderr).toMatch(/already has an MMR ledger entry/i)
       expect(duplicateHead.stdout).not.toContain('REVIEW')
+
+      const recoverableHead = run('[]', '{}', {
+        LEDGER_COMMENTS:
+          '<!-- mmr-cycle-ledger cycle=1 round=1 ' +
+          'head=1111111111111111111111111111111111111111 job=mmr-example ' +
+          'verdict=needs-user-decision next_cycle=1 next_round=1 -->',
+      })
+      expect(recoverableHead.status).toBe(0)
+      expect(recoverableHead.stdout).toContain('REVIEW')
     })
 
     it('non-executor tools still use `scaffold run <slug>`', () => {

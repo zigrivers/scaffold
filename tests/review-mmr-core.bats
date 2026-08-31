@@ -198,7 +198,7 @@ ROOT="$BATS_TEST_DIRNAME/.."
   grep -q 'REVIEW_SCOPE="staged"' "$F"
   grep -q 'REVIEW_SCOPE="range"' "$F"
   grep -q 'REVIEW_SCOPE="full"' "$F"
-  grep -q 'SESSION_ID="local-$REVIEW_SCOPE-' "$F"
+  grep -q 'SESSION_ID="local-$SCOPE_ID-' "$F"
 }
 
 @test "lean work-beads variants retain the autonomous restart safeguards" {
@@ -233,6 +233,15 @@ ROOT="$BATS_TEST_DIRNAME/.."
   grep -q 'LAST_REVIEWED_HEAD' "$F"
   grep -q 'CURRENT_HEAD' "$F"
   grep -q 'already has an MMR ledger entry' "$F"
+  grep -q 'needs-user-decision' "$F"
+  grep -q 'gh api user' "$F"
+  grep -q 'author.login' "$F"
+}
+
+@test "range reviews isolate session history by base ref" {
+  F="$ROOT/content/tools/review-code.md"
+  grep -q 'BASE_ID=' "$F"
+  grep -q 'local-$SCOPE_ID-$REPO_ID-' "$F"
 }
 
 @test "persistent trust changes remain a human authority stop" {

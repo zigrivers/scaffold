@@ -201,10 +201,17 @@ fi
 ${CODEX_REPO_ID_SETUP}
 SESSION_ID="pr-$REPO_ID-$PR_NUMBER"
 CURRENT_HEAD=$(gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid) || exit 1
-LEDGER_COMMENTS=$(gh pr view "$PR_NUMBER" --json comments --jq '.comments[].body') || exit 1
-LAST_REVIEWED_HEAD=$(printf '%s\\n' "$LEDGER_COMMENTS" |
-  sed -nE 's/.*<!-- mmr-cycle-ledger .*head=([0-9a-f]{40}).*-->.*/\\1/p' | tail -1)
-if [ -n "$LAST_REVIEWED_HEAD" ] && [ "$CURRENT_HEAD" = "$LAST_REVIEWED_HEAD" ]; then
+REVIEW_ACTOR=$(gh api user --jq .login) || exit 1
+case "$REVIEW_ACTOR" in ''|*[!a-zA-Z0-9-]*) echo "Invalid GitHub actor" >&2; exit 1;; esac
+LEDGER_COMMENTS=$(gh pr view "$PR_NUMBER" --json comments \
+  --jq '.comments[] | select(.author.login == "'"$REVIEW_ACTOR"'") | .body') || exit 1
+LAST_LEDGER=$(printf '%s\\n' "$LEDGER_COMMENTS" | sed -n '/<!-- mmr-cycle-ledger /p' | tail -1)
+LAST_REVIEWED_HEAD=$(printf '%s' "$LAST_LEDGER" |
+  sed -nE 's/.*head=([0-9a-f]{40}).*/\\1/p')
+LAST_REVIEWED_VERDICT=$(printf '%s' "$LAST_LEDGER" |
+  sed -nE 's/.*verdict=([^ ]+).*/\\1/p')
+if [ -n "$LAST_REVIEWED_HEAD" ] && [ "$CURRENT_HEAD" = "$LAST_REVIEWED_HEAD" ] \
+  && [ "$LAST_REVIEWED_VERDICT" != "needs-user-decision" ]; then
   echo "Current PR head already has an MMR ledger entry;" \
     "disposition that job instead of dispatching a duplicate round." >&2
   exit 1
@@ -213,6 +220,11 @@ ${CODEX_RESUME_SETUP}
 resolve_mmr_position "$SESSION_ID-cycle-" || exit 1
 mmr review --pr "$PR_NUMBER" --session "$SESSION_ID-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json
 \`\`\`
+
+After every completed call, classify and disposition every semantic finding,
+then use \`gh pr comment\` to post one evidence summary whose final line is:
+\`<!-- mmr-cycle-ledger cycle=<C> round=<R> head=<SHA> job=<ID> verdict=<V> next_cycle=<C> next_round=<R> -->\`.
+Only that authenticated review actor's markers are trusted on resume.
 
 Append \`--fix-threshold P0|P1|P2|P3\` to override the project's configured
 threshold for this invocation.

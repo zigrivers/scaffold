@@ -206,7 +206,7 @@ verified blocker remains :cite[content/tools/review-pr.md:169].
 
 Round-bounding is **native** to the engine. The wrappers pass `mmr review
 --session <target>-cycle-<C> --round <N> --max-rounds 3`
-:cite[content/tools/review-pr.md:88], incrementing `--round` each fix round
+:cite[content/tools/review-pr.md:103], incrementing `--round` each fix round
 (`--round` is required — MMR compares it against `--max-rounds`, so without it
 every call is round 1 and the cap never fires). MMR enforces the budget using a
 stable, line-number-independent `finding_key`

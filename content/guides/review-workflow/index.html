@@ -1581,7 +1581,7 @@ floor, required gates are green, every finding is dispositioned, and no
 verified blocker remains <span class="fp" data-path="content/tools/review-pr.md:169">content/tools/review-pr.md:169</span>.</p>
 <h3 id="how-the-round-budget-is-enforced">How the round budget is enforced</h3>
 <p>Round-bounding is <strong>native</strong> to the engine. The wrappers pass <code>mmr review --session &#x3C;target>-cycle-&#x3C;C> --round &#x3C;N> --max-rounds 3</code>
-<span class="fp" data-path="content/tools/review-pr.md:88">content/tools/review-pr.md:88</span>, incrementing <code>--round</code> each fix round
+<span class="fp" data-path="content/tools/review-pr.md:103">content/tools/review-pr.md:103</span>, incrementing <code>--round</code> each fix round
 (<code>--round</code> is required — MMR compares it against <code>--max-rounds</code>, so without it
 every call is round 1 and the cap never fires). MMR enforces the budget using a
 stable, line-number-independent <code>finding_key</code>
