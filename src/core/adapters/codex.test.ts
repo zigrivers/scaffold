@@ -185,6 +185,8 @@ describe('CodexAdapter', () => {
       expect(content).toContain('SESSION_ID="local-range-')
       expect(content).toContain('REPO_ID=$(')
       expect(content).toContain('local-full-$REPO_ID-')
+      expect(content).toContain('BASE_ID=')
+      expect(content).toContain('local-range-$BASE_ID-$REPO_ID-')
       expect(content).toMatch(/new exact head/i)
 
       // BASE_REF resolution mirrors content/tools/review-code.md (7-level ladder)
@@ -291,35 +293,51 @@ ${recipe}
         })
 
       const resumed = run(
-        JSON.stringify([{ session_id: 'pr-__REPO_ID__-42-cycle-2', rounds: 1 }]),
-        JSON.stringify({ session_id: 'pr-__REPO_ID__-42-cycle-2', rounds: 1 }),
+        JSON.stringify([{ session_id: 'pr-__REPO_ID__-42-cycle-2', rounds: 1, jobs: ['mmr-prev'] }]),
+        JSON.stringify({ session_id: 'pr-__REPO_ID__-42-cycle-2', rounds: 1, jobs: ['mmr-prev'] }),
+        { LEDGER_COMMENTS:
+          '<!-- mmr-cycle-ledger cycle=2 round=1 ' +
+          'head=0000000000000000000000000000000000000000 job=mmr-prev ' +
+          'verdict=blocked next_cycle=2 next_round=2 -->' },
       )
       expect(resumed.status).toBe(0)
       expect(resumed.stdout).toMatch(/--session pr-[0-9a-f]{12}-42-cycle-2 --round 2 --max-rounds 3/)
 
       const capped = run(
-        JSON.stringify([{ session_id: 'pr-__REPO_ID__-42-cycle-2', rounds: 3 }]),
-        JSON.stringify({ session_id: 'pr-__REPO_ID__-42-cycle-2', rounds: 3 }),
+        JSON.stringify([{ session_id: 'pr-__REPO_ID__-42-cycle-2', rounds: 3, jobs: ['mmr-prev'] }]),
+        JSON.stringify({ session_id: 'pr-__REPO_ID__-42-cycle-2', rounds: 3, jobs: ['mmr-prev'] }),
       )
       expect(capped.status).toBe(1)
       expect(capped.stderr).toMatch(/latest cycle reached round 3/i)
       expect(capped.stdout).not.toContain('REVIEW')
 
       const restarted = run(
-        JSON.stringify([{ session_id: 'pr-__REPO_ID__-42-cycle-2', rounds: 3 }]),
-        JSON.stringify({ session_id: 'pr-__REPO_ID__-42-cycle-2', rounds: 3 }),
-        { CYCLE: '3', ROUND: '1' },
+        JSON.stringify([{ session_id: 'pr-__REPO_ID__-42-cycle-2', rounds: 3, jobs: ['mmr-prev'] }]),
+        JSON.stringify({ session_id: 'pr-__REPO_ID__-42-cycle-2', rounds: 3, jobs: ['mmr-prev'] }),
+        {
+          CYCLE: '3', ROUND: '1',
+          LEDGER_COMMENTS:
+            '<!-- mmr-cycle-ledger cycle=2 round=3 ' +
+            'head=0000000000000000000000000000000000000000 job=mmr-prev ' +
+            'verdict=blocked next_cycle=3 next_round=1 -->',
+        },
       )
       expect(restarted.status).toBe(0)
       expect(restarted.stdout).toMatch(/--session pr-[0-9a-f]{12}-42-cycle-3 --round 1 --max-rounds 3/)
 
       const staleOverride = run(
-        JSON.stringify([{ session_id: 'pr-__REPO_ID__-42-cycle-2', rounds: 1 }]),
-        JSON.stringify({ session_id: 'pr-__REPO_ID__-42-cycle-2', rounds: 1 }),
-        { CYCLE: '1', ROUND: '1' },
+        JSON.stringify([{ session_id: 'pr-__REPO_ID__-42-cycle-2', rounds: 1, jobs: ['mmr-prev'] }]),
+        JSON.stringify({ session_id: 'pr-__REPO_ID__-42-cycle-2', rounds: 1, jobs: ['mmr-prev'] }),
+        {
+          CYCLE: '1', ROUND: '1',
+          LEDGER_COMMENTS:
+            '<!-- mmr-cycle-ledger cycle=2 round=1 ' +
+            'head=0000000000000000000000000000000000000000 job=mmr-prev ' +
+            'verdict=blocked next_cycle=2 next_round=2 -->',
+        },
       )
       expect(staleOverride.status).toBe(1)
-      expect(staleOverride.stderr).toMatch(/does not match MMR session history/i)
+      expect(staleOverride.stderr).toMatch(/disagree with the PR ledger marker/i)
       expect(staleOverride.stdout).not.toContain('REVIEW')
 
       const duplicateHead = run('[]', '{}', {
@@ -332,14 +350,32 @@ ${recipe}
       expect(duplicateHead.stderr).toMatch(/already has an MMR ledger entry/i)
       expect(duplicateHead.stdout).not.toContain('REVIEW')
 
-      const recoverableHead = run('[]', '{}', {
-        LEDGER_COMMENTS:
-          '<!-- mmr-cycle-ledger cycle=1 round=1 ' +
-          'head=1111111111111111111111111111111111111111 job=mmr-example ' +
-          'verdict=needs-user-decision next_cycle=1 next_round=1 -->',
-      })
+      const recoverableHead = run(
+        JSON.stringify([{ session_id: 'pr-__REPO_ID__-42-cycle-1', rounds: 1, jobs: ['mmr-example'] }]),
+        JSON.stringify({ session_id: 'pr-__REPO_ID__-42-cycle-1', rounds: 1, jobs: ['mmr-example'] }),
+        {
+          LEDGER_COMMENTS:
+            '<!-- mmr-cycle-ledger cycle=1 round=1 ' +
+            'head=1111111111111111111111111111111111111111 job=mmr-example ' +
+            'verdict=needs-user-decision next_cycle=1 next_round=1 -->',
+        },
+      )
       expect(recoverableHead.status).toBe(0)
       expect(recoverableHead.stdout).toContain('REVIEW')
+
+      const ledgerMismatch = run(
+        JSON.stringify([{ session_id: 'pr-__REPO_ID__-42-cycle-1', rounds: 1, jobs: ['mmr-other'] }]),
+        JSON.stringify({ session_id: 'pr-__REPO_ID__-42-cycle-1', rounds: 1, jobs: ['mmr-other'] }),
+        {
+          LEDGER_COMMENTS:
+            '<!-- mmr-cycle-ledger cycle=1 round=1 ' +
+            'head=0000000000000000000000000000000000000000 job=mmr-example ' +
+            'verdict=blocked next_cycle=1 next_round=2 -->',
+        },
+      )
+      expect(ledgerMismatch.status).toBe(1)
+      expect(ledgerMismatch.stderr).toMatch(/ledger and MMR session history disagree/i)
+      expect(ledgerMismatch.stdout).not.toContain('REVIEW')
     })
 
     it('non-executor tools still use `scaffold run <slug>`', () => {

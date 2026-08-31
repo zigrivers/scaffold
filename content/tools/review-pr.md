@@ -184,6 +184,17 @@ acceptance criteria, or a demonstrated technical plateau after safe approaches
 are exhausted. An unresolved required safeguard is not a plateau. Surface
 channel auth failures with the recovery command MMR prints.
 
+After disposition, post the evidence summary and marker explicitly:
+
+```bash
+gh pr comment "$PR_NUMBER" --body "<evidence summary>
+
+<!-- mmr-cycle-ledger cycle=$CYCLE round=$ROUND head=$CURRENT_HEAD job=$JOB_ID verdict=<verdict> next_cycle=<C> next_round=<R> -->"
+```
+
+The marker must be the final line, and its next position must match the verified
+MMR session history.
+
 ### Step 5: Report
 
 Report the cycle and round, exact reviewed head, which channels completed or

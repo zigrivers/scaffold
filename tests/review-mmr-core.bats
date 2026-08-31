@@ -236,6 +236,8 @@ ROOT="$BATS_TEST_DIRNAME/.."
   grep -q 'needs-user-decision' "$F"
   grep -q 'gh api user' "$F"
   grep -q 'author.login' "$F"
+  grep -q 'gh pr comment' "$F"
+  grep -q 'final line' "$F"
 }
 
 @test "range reviews isolate session history by base ref" {

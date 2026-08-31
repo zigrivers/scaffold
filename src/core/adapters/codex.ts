@@ -48,7 +48,9 @@ const CODEX_REPO_ID_SETUP = `REPO_ID=$(
 )`
 
 const CODEX_RESUME_SETUP = `resolve_mmr_position() {
-  local session_prefix="$1" latest_cycle session_json recorded_rounds override=false
+  local session_prefix="$1" retry_same_round="\${2:-false}"
+  local latest_cycle session_json recorded_rounds override=false
+  RESOLVED_SESSION_JSON=""
 
   if [ -n "\${CYCLE+x}" ] || [ -n "\${ROUND+x}" ]; then
     if [ -z "\${CYCLE+x}" ] || [ -z "\${ROUND+x}" ]; then
@@ -81,6 +83,7 @@ if (cycles.length) process.stdout.write(String(Math.max(...cycles)));
   fi
 
   session_json=$(mmr sessions show "$session_prefix$latest_cycle") || return 1
+  RESOLVED_SESSION_JSON="$session_json"
   recorded_rounds=$(printf '%s' "$session_json" | node -e '
 const record = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
 if (!Number.isInteger(record.rounds) || record.rounds < 0 || record.rounds > 3) process.exit(1);
@@ -88,6 +91,10 @@ process.stdout.write(String(record.rounds));
 ') || { echo "Invalid MMR session record; reconcile it before review." >&2; return 1; }
 
   if [ "$override" = true ]; then
+    if [ "$retry_same_round" = true ] && [ "$CYCLE" -eq "$latest_cycle" ] \
+      && [ "$ROUND" -eq "$recorded_rounds" ]; then
+      return 0
+    fi
     if [ "$CYCLE" -eq "$latest_cycle" ] && [ "$recorded_rounds" -lt 3 ] \
       && [ "$ROUND" -eq "$((recorded_rounds + 1))" ]; then
       return 0
@@ -165,11 +172,13 @@ mmr review --staged --session "$SESSION_ID-cycle-$CYCLE" --round "$ROUND" --max-
 
 \`\`\`bash
 BRANCH_NAME="<branch-name>"
+BASE_REF=main
+BASE_ID=$(printf '%s' "$BASE_REF" | git hash-object --stdin | cut -c1-12)
 ${CODEX_REPO_ID_SETUP}
-SESSION_ID="local-range-$REPO_ID-$(printf '%s' "$BRANCH_NAME" | tr -c 'a-zA-Z0-9_-' '-')"
+SESSION_ID="local-range-$BASE_ID-$REPO_ID-$(printf '%s' "$BRANCH_NAME" | tr -c 'a-zA-Z0-9_-' '-')"
 ${CODEX_RESUME_SETUP}
 resolve_mmr_position "$SESSION_ID-cycle-" || exit 1
-mmr review --base main --head "$BRANCH_NAME" --session "$SESSION_ID-cycle-$CYCLE" \
+mmr review --base "$BASE_REF" --head "$BRANCH_NAME" --session "$SESSION_ID-cycle-$CYCLE" \
   --round "$ROUND" --max-rounds 3 --sync --format json
 \`\`\`
 
@@ -206,10 +215,24 @@ case "$REVIEW_ACTOR" in ''|*[!a-zA-Z0-9-]*) echo "Invalid GitHub actor" >&2; exi
 LEDGER_COMMENTS=$(gh pr view "$PR_NUMBER" --json comments \
   --jq '.comments[] | select(.author.login == "'"$REVIEW_ACTOR"'") | .body') || exit 1
 LAST_LEDGER=$(printf '%s\\n' "$LEDGER_COMMENTS" | sed -n '/<!-- mmr-cycle-ledger /p' | tail -1)
-LAST_REVIEWED_HEAD=$(printf '%s' "$LAST_LEDGER" |
-  sed -nE 's/.*head=([0-9a-f]{40}).*/\\1/p')
-LAST_REVIEWED_VERDICT=$(printf '%s' "$LAST_LEDGER" |
-  sed -nE 's/.*verdict=([^ ]+).*/\\1/p')
+LAST_REVIEWED_HEAD=""; LAST_REVIEWED_VERDICT=""
+if [ -n "$LAST_LEDGER" ]; then
+  LEDGER_PATTERN='cycle=([1-9][0-9]*)[[:space:]]+round=([1-3])'
+  LEDGER_PATTERN+='[[:space:]]+head=([0-9a-f]{40})[[:space:]]+job=(mmr-[a-z0-9]+)'
+  LEDGER_PATTERN+='[[:space:]]+verdict=([^[:space:]]+)[[:space:]]+next_cycle=([1-9][0-9]*)'
+  LEDGER_PATTERN+='[[:space:]]+next_round=([1-3])'
+  if ! [[ "$LAST_LEDGER" =~ $LEDGER_PATTERN ]]; then
+    echo "Invalid MMR ledger marker; reconcile it before review." >&2; exit 1
+  fi
+  LAST_CYCLE="\${BASH_REMATCH[1]}"; LAST_ROUND="\${BASH_REMATCH[2]}"
+  LAST_REVIEWED_HEAD="\${BASH_REMATCH[3]}"; LAST_JOB="\${BASH_REMATCH[4]}"
+  LAST_REVIEWED_VERDICT="\${BASH_REMATCH[5]}"
+  if { [ -n "\${CYCLE+x}" ] || [ -n "\${ROUND+x}" ]; } \
+    && { [ "\${CYCLE:-}" != "\${BASH_REMATCH[6]}" ] || [ "\${ROUND:-}" != "\${BASH_REMATCH[7]}" ]; }; then
+    echo "CYCLE and ROUND disagree with the PR ledger marker." >&2; exit 1
+  fi
+  CYCLE="\${BASH_REMATCH[6]}"; ROUND="\${BASH_REMATCH[7]}"
+fi
 if [ -n "$LAST_REVIEWED_HEAD" ] && [ "$CURRENT_HEAD" = "$LAST_REVIEWED_HEAD" ] \
   && [ "$LAST_REVIEWED_VERDICT" != "needs-user-decision" ]; then
   echo "Current PR head already has an MMR ledger entry;" \
@@ -217,7 +240,20 @@ if [ -n "$LAST_REVIEWED_HEAD" ] && [ "$CURRENT_HEAD" = "$LAST_REVIEWED_HEAD" ] \
   exit 1
 fi
 ${CODEX_RESUME_SETUP}
-resolve_mmr_position "$SESSION_ID-cycle-" || exit 1
+RETRY_SAME_ROUND=false
+[ "$LAST_REVIEWED_VERDICT" = "needs-user-decision" ] && RETRY_SAME_ROUND=true
+resolve_mmr_position "$SESSION_ID-cycle-" "$RETRY_SAME_ROUND" || exit 1
+if [ -z "$LAST_LEDGER" ] && [ -n "$RESOLVED_SESSION_JSON" ]; then
+  echo "MMR session history exists without a PR ledger marker; reconcile it before review." >&2; exit 1
+fi
+if [ -n "$LAST_LEDGER" ]; then
+  printf '%s' "$RESOLVED_SESSION_JSON" | node -e '
+const record = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+if (record.rounds !== Number(process.argv[1]) || record.jobs?.at(-1) !== process.argv[2]) process.exit(1);
+' "$LAST_ROUND" "$LAST_JOB" || {
+    echo "PR ledger and MMR session history disagree; reconcile them before review." >&2; exit 1
+  }
+fi
 mmr review --pr "$PR_NUMBER" --session "$SESSION_ID-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json
 \`\`\`
 
