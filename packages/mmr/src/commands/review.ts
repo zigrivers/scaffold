@@ -112,6 +112,40 @@ function formatReconciledResults(results: ReconciledResults, outputFormat: Outpu
   return formatJson(results)
 }
 
+/**
+ * Return the prior job when a session is about to review identical content.
+ * The sole exception is a same-round retry after no channel determination.
+ */
+function duplicateSessionTarget(
+  sessionStore: SessionStore,
+  sessionId: string,
+  diff: string,
+  round: number | undefined,
+): string | undefined {
+  const record = sessionStore.show(sessionId)
+  const priorJobId = record?.jobs.at(-1)
+  if (record === undefined || priorJobId === undefined) return undefined
+
+  const jobStore = new JobStore(resolveJobsDir())
+  let priorDiff: string
+  try {
+    priorDiff = jobStore.loadDiff(priorJobId)
+  } catch {
+    return undefined
+  }
+  if (priorDiff !== diff) return undefined
+  if (round === record.rounds) {
+    try {
+      const resultPath = `${jobStore.getJobDir(priorJobId)}/results.json`
+      const result = JSON.parse(fs.readFileSync(resultPath, 'utf-8')) as { verdict?: string }
+      if (result.verdict === 'needs-user-decision') return undefined
+    } catch {
+      // Identical content without a trustworthy result is not safe to repeat.
+    }
+  }
+  return priorJobId
+}
+
 function buildMaxRoundsExceededResult(
   session: string,
   round: number,
@@ -526,6 +560,15 @@ export const reviewCommand: CommandModule<object, ReviewArgs> = {
     let sessionLink: { store: SessionStore; id: string } | undefined
     if (args.session !== undefined) {
       sessionLink = { store: getSessionStore(), id: args.session }
+      const duplicateJob = duplicateSessionTarget(sessionLink.store, sessionLink.id, diff, args.round)
+      if (duplicateJob !== undefined) {
+        console.error(
+          `Exact review target already dispatched in ${duplicateJob}; ` +
+          'disposition that job instead of consuming another round.',
+        )
+        process.exitCode = 1
+        return
+      }
     }
 
     // 3. Determine enabled channels — channels_disabled applies to the default list only;

@@ -242,6 +242,7 @@ describe('CodexAdapter', () => {
       expect(content).toContain('gh api user')
       expect(content).toContain('author.login')
       expect(content).toContain('gh pr comment')
+      expect(content).toContain('[0-9a-f]{40,64}')
       expect(content).toContain('--round "$ROUND" --max-rounds 3')
       expect(content).toContain('mmr sessions list')
       expect(content).toContain('mmr sessions show')

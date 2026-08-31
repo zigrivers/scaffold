@@ -74,4 +74,84 @@ describe('review - auto-link to session', () => {
       fs.rmSync(tmpHome, { recursive: true, force: true })
     }
   })
+
+  it('rejects an identical session target unless the same round needs a retry', async () => {
+    vi.resetModules()
+    const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'mmr-link-'))
+    const diffPath = path.join(tmpHome, 'sample.diff')
+    const diff = [
+      'diff --git a/x.ts b/x.ts',
+      '--- a/x.ts',
+      '+++ b/x.ts',
+      '@@ -1,1 +1,2 @@',
+      ' export const foo = 1',
+      '+export const bar = 2',
+      '',
+    ].join('\n')
+    fs.writeFileSync(diffPath, diff)
+    fs.writeFileSync(path.join(tmpHome, '.mmr.yaml'), [
+      'version: 1',
+      'channels:',
+      '  local:',
+      '    command: local-review',
+      '    auth:',
+      '      check: "true"',
+      '      failure_exit_codes: [1]',
+      '      recovery: "x"',
+    ].join('\n'))
+    process.env.HOME = tmpHome
+    delete process.env.MMR_HOME
+
+    const { JobStore } = await import('../../src/core/job-store.js')
+    const { SessionStore } = await import('../../src/commands/sessions.js')
+    const store = new JobStore(path.join(tmpHome, '.mmr', 'jobs'))
+    const prior = store.createJob({
+      fix_threshold: 'P2', format: 'json', channels: ['local'], session_id: 'feat-foo', round: 1,
+    })
+    store.saveDiff(prior.job_id, diff)
+    SessionStore.fromHome(tmpHome).addJob('feat-foo', prior.job_id, 1)
+
+    const dispatchSpy = vi.fn().mockResolvedValue(undefined)
+    vi.doMock('../../src/core/dispatcher.js', () => ({ dispatchChannel: dispatchSpy }))
+    vi.doMock('../../src/core/auth.js', () => ({
+      checkInstalled: vi.fn().mockResolvedValue(true),
+      checkAuth: vi.fn().mockResolvedValue({ status: 'ok' }),
+    }))
+    const { reviewCommand } = await import('../../src/commands/review.js')
+    vi.spyOn(process, 'cwd').mockReturnValue(tmpHome)
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    const errors: string[] = []
+    vi.spyOn(console, 'error').mockImplementation((message?: unknown) => { errors.push(String(message)) })
+    try {
+      await reviewCommand.handler({
+        diff: diffPath,
+        channels: ['local'],
+        session: 'feat-foo',
+        round: 2,
+        trustProjectConfig: true,
+        _: ['review'],
+        $0: 'mmr',
+      } as never)
+      expect(dispatchSpy).not.toHaveBeenCalled()
+      expect(errors.join('\n')).toMatch(/exact review target already dispatched/i)
+
+      fs.writeFileSync(path.join(store.getJobDir(prior.job_id), 'results.json'), JSON.stringify({
+        verdict: 'needs-user-decision',
+      }))
+      await reviewCommand.handler({
+        diff: diffPath,
+        channels: ['local'],
+        session: 'feat-foo',
+        round: 1,
+        trustProjectConfig: true,
+        _: ['review'],
+        $0: 'mmr',
+      } as never)
+      expect(dispatchSpy).toHaveBeenCalledOnce()
+    } finally {
+      vi.doUnmock('../../src/core/dispatcher.js')
+      vi.doUnmock('../../src/core/auth.js')
+      fs.rmSync(tmpHome, { recursive: true, force: true })
+    }
+  })
 })

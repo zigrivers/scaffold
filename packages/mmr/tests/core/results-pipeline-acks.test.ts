@@ -60,6 +60,9 @@ describe('runResultsPipeline — ack integration (T2-D)', () => {
     expect(results.reconciled_findings[0].acknowledged).toBe(true)
     expect(results.reconciled_findings[0].ack_reason).toBe('intentional')
     expect(results.reconciled_findings[0].ack_match).toBe('exact')
+    expect(results.reconciled_findings[0].ack_scope).toBe('project')
+    expect(results.metadata.acknowledged_findings).toBe(1)
+    expect(results.summary).toMatch(/1 acknowledged disposition recorded/)
     // Gate must pass — the only finding is acked.
     expect(results.verdict).toBe('pass')
     // Acked findings still count as advisory.

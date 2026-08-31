@@ -213,8 +213,11 @@ describe('mmr ack CLI', () => {
       expect(afterResult.reconciled_findings[0]).toMatchObject({
         acknowledged: true,
         ack_match: 'exact',
+        ack_scope: 'job',
         ack_reason: 'reject: verified false positive',
       })
+      expect(afterResult.metadata.acknowledged_findings).toBe(1)
+      expect(afterResult.summary).toMatch(/1 acknowledged disposition recorded/)
 
       const untouched = runResults(untouchedJob, { home, cwd })
       expect(untouched.exited).toBe(2)

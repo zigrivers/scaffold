@@ -62,6 +62,8 @@ export interface ReconciledFinding extends Finding {
   /** True when this finding has been silenced via `mmr ack` (T2-D). */
   acknowledged?: boolean
   ack_reason?: string
+  /** Scope that supplied the acknowledgment, retained for auditability. */
+  ack_scope?: 'project' | 'user' | 'job'
   /** How the ack was resolved: exact key match or location-anchored Jaccard fallback. */
   ack_match?: 'exact' | 'fuzzy'
   /** Reserved for T2-C (v3.31): finding was auto-downgraded after repeat threshold. */
@@ -143,6 +145,8 @@ export interface ReconciledResults {
     channels_dispatched: number
     channels_completed: number
     channels_partial: number
+    /** Number of visible findings dispositioned through acknowledgments. */
+    acknowledged_findings?: number
     total_elapsed: string
   }
   /** Trust mode under which this review ran (§5 decision 1). */

@@ -240,6 +240,10 @@ ROOT="$BATS_TEST_DIRNAME/.."
   grep -q 'final line' "$F"
 }
 
+@test "review-pr accepts SHA-1 and SHA-256 exact heads" {
+  grep -Fq '[0-9a-f]{40,64}' "$ROOT/content/tools/review-pr.md"
+}
+
 @test "range reviews isolate session history by base ref" {
   F="$ROOT/content/tools/review-code.md"
   grep -q 'BASE_ID=' "$F"

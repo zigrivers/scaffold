@@ -95,7 +95,7 @@ LEDGER_COMMENTS=$(gh pr view "$PR_NUMBER" --json comments \
   --jq '.comments[] | select(.author.login == "'"$REVIEW_ACTOR"'") | .body') || exit 1
 LAST_LEDGER=$(printf '%s\n' "$LEDGER_COMMENTS" | sed -n '/<!-- mmr-cycle-ledger /p' | tail -1)
 LAST_REVIEWED_HEAD=$(printf '%s' "$LAST_LEDGER" |
-  sed -nE 's/.*head=([0-9a-f]{40}).*/\1/p')
+  sed -nE 's/.*head=([0-9a-f]{40,64}).*/\1/p')
 LAST_REVIEWED_VERDICT=$(printf '%s' "$LAST_LEDGER" |
   sed -nE 's/.*verdict=([^ ]+).*/\1/p')
 if [ -n "$LAST_REVIEWED_HEAD" ] && [ "$CURRENT_HEAD" = "$LAST_REVIEWED_HEAD" ] \

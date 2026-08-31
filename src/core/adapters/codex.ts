@@ -218,7 +218,7 @@ LAST_LEDGER=$(printf '%s\\n' "$LEDGER_COMMENTS" | sed -n '/<!-- mmr-cycle-ledger
 LAST_REVIEWED_HEAD=""; LAST_REVIEWED_VERDICT=""
 if [ -n "$LAST_LEDGER" ]; then
   LEDGER_PATTERN='cycle=([1-9][0-9]*)[[:space:]]+round=([1-3])'
-  LEDGER_PATTERN+='[[:space:]]+head=([0-9a-f]{40})[[:space:]]+job=(mmr-[a-z0-9]+)'
+  LEDGER_PATTERN+='[[:space:]]+head=([0-9a-f]{40,64})[[:space:]]+job=(mmr-[a-z0-9]+)'
   LEDGER_PATTERN+='[[:space:]]+verdict=([^[:space:]]+)[[:space:]]+next_cycle=([1-9][0-9]*)'
   LEDGER_PATTERN+='[[:space:]]+next_round=([1-3])'
   if ! [[ "$LAST_LEDGER" =~ $LEDGER_PATTERN ]]; then
