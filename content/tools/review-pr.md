@@ -111,8 +111,9 @@ if [ -z "${CYCLE+x}" ] || [ -z "${ROUND+x}" ]; then
 fi
 MMR_FLAGS=(--pr "$PR_NUMBER" --session "$SESSION_ID-cycle-$CYCLE" --round "$ROUND" --max-rounds 3 --sync --format json)
 [ -n "$FIX_THRESHOLD" ] && MMR_FLAGS+=(--fix-threshold "$FIX_THRESHOLD")
-# mmr exits 0 pass/degraded · 2 blocked · 3 needs-user-decision — the exit code
-# IS the verdict, so capture it without aborting (matters under `set -e`).
+# Exit 1 pre-dispatch guard failures happen before MMR returns a verdict.
+# Once MMR runs, it exits 0 pass/degraded · 2 blocked · 3 needs-user-decision,
+# so capture that verdict without aborting (matters under `set -e`).
 MMR_EXIT=0
 MMR_RESULT=$(mmr review "${MMR_FLAGS[@]}") || MMR_EXIT=$?
 echo "$MMR_RESULT"
@@ -123,9 +124,11 @@ Never invoke round 4. At the third-round result, apply the bounded remediation
 rule in Step 4.
 
 Read `fix_threshold` and `reconciled_findings` from the JSON. Exit codes:
-`0` pass/degraded-pass · `2` blocked · `3` needs-user-decision. Cross-check each
-finding's `location` against `gh pr diff "$PR_NUMBER" --name-only`; out-of-diff
-findings are contamination noise.
+`0` pass/degraded-pass · `2` blocked · `3` needs-user-decision. Exit `1` before
+dispatch is a wrapper guard failure; follow its error instead of treating it as
+a review verdict. Cross-check each finding's `location` against
+`gh pr diff "$PR_NUMBER" --name-only`; out-of-diff findings are contamination
+noise.
 
 If `mmr` is not installed, see **Manual fallback** below.
 

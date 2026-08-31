@@ -245,6 +245,17 @@ ROOT="$BATS_TEST_DIRNAME/.."
   grep -Fq '[0-9a-f]{40,64}' "$ROOT/content/tools/review-pr.md"
 }
 
+@test "review wrappers distinguish pre-dispatch guard failures from review verdicts" {
+  for F in "$ROOT/content/tools/review-pr.md" "$ROOT/content/tools/review-code.md"; do
+    grep -q '1 pre-dispatch guard' "$F"
+  done
+}
+
+@test "local review resume branches before incrementing a completed cycle" {
+  grep -q 'If the recorded round is 3, do not increment it' \
+    "$ROOT/content/tools/review-code.md"
+}
+
 @test "range reviews isolate session history by base ref" {
   F="$ROOT/content/tools/review-code.md"
   grep -q 'BASE_ID=' "$F"

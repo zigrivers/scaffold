@@ -157,7 +157,7 @@ finding is always reported as `blocked`.
 `needs-user-decision`. A final-round in-scope blocker starts the bounded repair
 process below; it does not require owner approval. The wrappers report a PR as
 merge-ready only on `pass` / `degraded-pass`
-:cite[content/tools/review-pr.md:204].
+:cite[content/tools/review-pr.md:207].
 :::
 
 ## Step 4 — Fix blocking findings in bounded cycles
@@ -200,7 +200,7 @@ project-specific product protections.
 
 Merge only when the final exact head has completed the configured MMR channel
 floor, required gates are green, every finding is dispositioned, and no
-verified blocker remains :cite[content/tools/review-pr.md:204].
+verified blocker remains :cite[content/tools/review-pr.md:207].
 
 ### How the round budget is enforced
 

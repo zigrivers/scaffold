@@ -105,10 +105,11 @@ fi
 SESSION_ID="local-$SCOPE_ID-$REPO_ID-$(printf '%s' "$BRANCH" | tr -c 'a-zA-Z0-9_-' '-')"
 # On resume, run `mmr sessions list`, select the highest numeric cycle for the
 # exact `$SESSION_ID-cycle-` prefix, and confirm it with
-# `mmr sessions show "$SESSION_ID-cycle-$CYCLE"`. Set ROUND to the recorded
-# `rounds` plus one. If the record is missing or inconsistent, do not start another review;
-# reconcile the session evidence first. A recorded round 3 may
-# advance to a new cycle at round 1 only after Step 4's concrete repair and gate.
+# `mmr sessions show "$SESSION_ID-cycle-$CYCLE"`.
+# If the recorded round is 3, do not increment it; advance to a new cycle at
+# round 1 only after Step 4's concrete repair and gate. Otherwise set ROUND to
+# the recorded `rounds` plus one. If the record is missing or inconsistent, do not start another review;
+# reconcile the session evidence first.
 # Use cycle 1 only when the list contains no prior review for this exact target.
 if [ -z "${CYCLE+x}" ] || [ -z "${ROUND+x}" ]; then
   echo "Set CYCLE and ROUND from the verified review history before dispatching." >&2
@@ -123,9 +124,10 @@ Exactly ONE invocation runs, routed by scope (this is a single script — the
 review output so Step 3 has a real `JOB_ID`:
 
 ```bash
-# mmr exits 0 pass/degraded · 2 blocked · 3 needs-user-decision — the exit code
-# IS the verdict, so capture it without aborting the routing (matters under
-# `set -e`); `|| MMR_EXIT=$?` on each branch does that.
+# Exit 1 pre-dispatch guard failures happen before MMR returns a verdict.
+# Once MMR runs, it exits 0 pass/degraded · 2 blocked · 3 needs-user-decision,
+# so capture that verdict without aborting the routing (matters under `set -e`);
+# `|| MMR_EXIT=$?` on each branch does that.
 MMR_EXIT=0
 if [ "$STAGED_ONLY" = true ]; then
   # --staged → staged changes only:
