@@ -16,6 +16,10 @@
 
 ROOT="$BATS_TEST_DIRNAME/.."
 
+@test "Scaffold provides the merge queue gate it requires" {
+  grep -q '^check-affected: check-all' "$ROOT/Makefile"
+}
+
 # --- review-pr.md -----------------------------------------------------------
 
 @test "review-pr.md drops the wrapper-side finding-hash bookkeeping" {

@@ -1,4 +1,4 @@
-.PHONY: help test lint validate validate-knowledge check check-all eval ts-check setup hooks dashboard-test mmr-build mmr-test mmr-check agent-integration-check agent-skills-check check-reference-citations check-freshness-citations guides-check
+.PHONY: help test lint validate validate-knowledge check check-all check-affected eval ts-check setup hooks dashboard-test mmr-build mmr-test mmr-check agent-integration-check agent-skills-check check-reference-citations check-freshness-citations guides-check
 
 help: ## Show available targets
 	@grep -E '^[a-z][a-z-]*:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -24,6 +24,8 @@ check-freshness-citations: check-reference-citations ## Back-compat alias for ch
 check: lint validate test eval ## Run bash quality gates (lint + validate + test + eval)
 
 check-all: check ts-check mmr-check agent-integration-check agent-skills-check validate-knowledge check-reference-citations guides-check ## Run all quality gates (bash + TypeScript + knowledge frontmatter + reference-page citations)
+
+check-affected: check-all ## Merge queue gate; Scaffold changes require the full suite
 
 ts-check: ## Run TypeScript quality gates (lint + type-check + build + unit + e2e + perf tests)
 	npm run lint
