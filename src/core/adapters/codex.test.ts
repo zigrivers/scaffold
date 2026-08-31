@@ -351,6 +351,29 @@ ${recipe}
       expect(duplicateHead.stderr).toMatch(/already has an MMR ledger entry/i)
       expect(duplicateHead.stdout).not.toContain('REVIEW')
 
+      const revisitedHead = run(
+        JSON.stringify([{
+          session_id: 'pr-__REPO_ID__-42-cycle-1', rounds: 2,
+          jobs: ['mmr-example', 'mmr-latest'],
+        }]),
+        JSON.stringify({
+          session_id: 'pr-__REPO_ID__-42-cycle-1', rounds: 2,
+          jobs: ['mmr-example', 'mmr-latest'],
+        }),
+        {
+          LEDGER_COMMENTS:
+            '<!-- mmr-cycle-ledger cycle=1 round=1 ' +
+            'head=1111111111111111111111111111111111111111 job=mmr-example ' +
+            'verdict=pass next_cycle=1 next_round=2 -->\n' +
+            '<!-- mmr-cycle-ledger cycle=1 round=2 ' +
+            'head=2222222222222222222222222222222222222222 job=mmr-latest ' +
+            'verdict=blocked next_cycle=1 next_round=3 -->',
+        },
+      )
+      expect(revisitedHead.status).toBe(1)
+      expect(revisitedHead.stderr).toMatch(/already has an MMR ledger entry/i)
+      expect(revisitedHead.stdout).not.toContain('REVIEW')
+
       const recoverableHead = run(
         JSON.stringify([{ session_id: 'pr-__REPO_ID__-42-cycle-1', rounds: 1, jobs: ['mmr-example'] }]),
         JSON.stringify({ session_id: 'pr-__REPO_ID__-42-cycle-1', rounds: 1, jobs: ['mmr-example'] }),

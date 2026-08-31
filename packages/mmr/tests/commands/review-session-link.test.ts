@@ -109,7 +109,8 @@ describe('review - auto-link to session', () => {
       fix_threshold: 'P2', format: 'json', channels: ['local'], session_id: 'feat-foo', round: 1,
     })
     store.saveDiff(prior.job_id, diff)
-    SessionStore.fromHome(tmpHome).addJob('feat-foo', prior.job_id, 1)
+    const sessionStore = SessionStore.fromHome(tmpHome)
+    sessionStore.addJob('feat-foo', prior.job_id, 1)
 
     const dispatchSpy = vi.fn().mockResolvedValue(undefined)
     vi.doMock('../../src/core/dispatcher.js', () => ({ dispatchChannel: dispatchSpy }))
@@ -142,6 +143,38 @@ describe('review - auto-link to session', () => {
         diff: diffPath,
         channels: ['local'],
         session: 'feat-foo',
+        round: 1,
+        trustProjectConfig: true,
+        _: ['review'],
+        $0: 'mmr',
+      } as never)
+      expect(dispatchSpy).toHaveBeenCalledOnce()
+
+      const retriedJob = sessionStore.show('feat-foo')?.jobs.at(-1)
+      expect(retriedJob).toBeDefined()
+      fs.writeFileSync(path.join(store.getJobDir(retriedJob!), 'results.json'), JSON.stringify({
+        verdict: 'needs-user-decision',
+      }))
+      await reviewCommand.handler({
+        diff: diffPath,
+        channels: ['local'],
+        session: 'feat-foo',
+        round: 1,
+        trustProjectConfig: true,
+        _: ['review'],
+        $0: 'mmr',
+      } as never)
+      expect(dispatchSpy).toHaveBeenCalledOnce()
+
+      const earlierCycle = store.createJob({
+        fix_threshold: 'P2', format: 'json', channels: ['local'], session_id: 'feat-cycle-1', round: 1,
+      })
+      store.saveDiff(earlierCycle.job_id, diff)
+      sessionStore.addJob('feat-cycle-1', earlierCycle.job_id, 1)
+      await reviewCommand.handler({
+        diff: diffPath,
+        channels: ['local'],
+        session: 'feat-cycle-2',
         round: 1,
         trustProjectConfig: true,
         _: ['review'],

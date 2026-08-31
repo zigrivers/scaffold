@@ -231,6 +231,7 @@ ROOT="$BATS_TEST_DIRNAME/.."
 @test "review-pr refuses to redispatch an unchanged exact head" {
   F="$ROOT/content/tools/review-pr.md"
   grep -q 'LAST_REVIEWED_HEAD' "$F"
+  grep -q 'MATCHING_HEAD_LEDGER' "$F"
   grep -q 'CURRENT_HEAD' "$F"
   grep -q 'already has an MMR ledger entry' "$F"
   grep -q 'needs-user-decision' "$F"

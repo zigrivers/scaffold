@@ -122,19 +122,35 @@ function duplicateSessionTarget(
   diff: string,
   round: number | undefined,
 ): string | undefined {
-  const record = sessionStore.show(sessionId)
-  const priorJobId = record?.jobs.at(-1)
-  if (record === undefined || priorJobId === undefined) return undefined
-
   const jobStore = new JobStore(resolveJobsDir())
-  let priorDiff: string
-  try {
-    priorDiff = jobStore.loadDiff(priorJobId)
-  } catch {
-    return undefined
-  }
-  if (priorDiff !== diff) return undefined
-  if (round === record.rounds) {
+  const record = sessionStore.show(sessionId)
+  const cycleMatch = sessionId.match(/^(.*-cycle-)[1-9][0-9]*$/)
+  const records = cycleMatch === null
+    ? (record === undefined ? [] : [record])
+    : sessionStore.list().filter((candidate) =>
+      candidate.session_id.startsWith(cycleMatch[1]) &&
+      /^[1-9][0-9]*$/.test(candidate.session_id.slice(cycleMatch[1].length)),
+    )
+  const matchingJobs = records.flatMap((candidate) => candidate.jobs).filter((jobId) => {
+    try {
+      return jobStore.loadDiff(jobId) === diff
+    } catch {
+      return false
+    }
+  })
+  if (matchingJobs.length === 0) return undefined
+
+  const priorJobId = record?.jobs.at(-1)
+  if (record !== undefined && priorJobId !== undefined && matchingJobs.includes(priorJobId)
+    && round === record.rounds && matchingJobs.every((jobId) => jobId === priorJobId)) {
+    const attempts = record.jobs.filter((jobId) => {
+      try {
+        return jobStore.loadJob(jobId).round === round
+      } catch {
+        return false
+      }
+    }).length
+    if (attempts !== 1) return priorJobId
     try {
       const resultPath = `${jobStore.getJobDir(priorJobId)}/results.json`
       const result = JSON.parse(fs.readFileSync(resultPath, 'utf-8')) as { verdict?: string }
@@ -143,7 +159,7 @@ function duplicateSessionTarget(
       // Identical content without a trustworthy result is not safe to repeat.
     }
   }
-  return priorJobId
+  return matchingJobs[0]
 }
 
 function buildMaxRoundsExceededResult(

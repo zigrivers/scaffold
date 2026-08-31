@@ -94,12 +94,14 @@ case "$REVIEW_ACTOR" in ''|*[!a-zA-Z0-9-]*) echo "Invalid GitHub actor" >&2; exi
 LEDGER_COMMENTS=$(gh pr view "$PR_NUMBER" --json comments \
   --jq '.comments[] | select(.author.login == "'"$REVIEW_ACTOR"'") | .body') || exit 1
 LAST_LEDGER=$(printf '%s\n' "$LEDGER_COMMENTS" | sed -n '/<!-- mmr-cycle-ledger /p' | tail -1)
+MATCHING_HEAD_LEDGER=$(printf '%s\n' "$LEDGER_COMMENTS" |
+  sed -n "/<!-- mmr-cycle-ledger .* head=$CURRENT_HEAD /p" | tail -1)
 LAST_REVIEWED_HEAD=$(printf '%s' "$LAST_LEDGER" |
   sed -nE 's/.*head=([0-9a-f]{40,64}).*/\1/p')
 LAST_REVIEWED_VERDICT=$(printf '%s' "$LAST_LEDGER" |
   sed -nE 's/.*verdict=([^ ]+).*/\1/p')
-if [ -n "$LAST_REVIEWED_HEAD" ] && [ "$CURRENT_HEAD" = "$LAST_REVIEWED_HEAD" ] \
-  && [ "$LAST_REVIEWED_VERDICT" != "needs-user-decision" ]; then
+if [ -n "$MATCHING_HEAD_LEDGER" ] && { [ "$MATCHING_HEAD_LEDGER" != "$LAST_LEDGER" ] \
+  || [ "$LAST_REVIEWED_VERDICT" != "needs-user-decision" ]; }; then
   echo "Current PR head already has an MMR ledger entry; disposition that job instead of dispatching a duplicate round." >&2
   exit 1
 fi

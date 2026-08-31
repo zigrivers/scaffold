@@ -1546,7 +1546,7 @@ finding is always reported as <code>blocked</code>.</p></div>
 <code>needs-user-decision</code>. A final-round in-scope blocker starts the bounded repair
 process below; it does not require owner approval. The wrappers report a PR as
 merge-ready only on <code>pass</code> / <code>degraded-pass</code>
-<span class="fp" data-path="content/tools/review-pr.md:203">content/tools/review-pr.md:203</span>.</p></div>
+<span class="fp" data-path="content/tools/review-pr.md:204">content/tools/review-pr.md:204</span>.</p></div>
 <h2 id="step-4-fix-blocking-findings-in-bounded-cycles">Step 4 — Fix blocking findings in bounded cycles</h2>
 <p>When the verdict is <code>blocked</code>, the loop is: verify each finding → repair the
 smallest root cause → add focused regression proof → run the required gate →
@@ -1578,10 +1578,10 @@ safeguards include security, privacy, accessibility, data integrity, and
 project-specific product protections.</p>
 <p>Merge only when the final exact head has completed the configured MMR channel
 floor, required gates are green, every finding is dispositioned, and no
-verified blocker remains <span class="fp" data-path="content/tools/review-pr.md:203">content/tools/review-pr.md:203</span>.</p>
+verified blocker remains <span class="fp" data-path="content/tools/review-pr.md:204">content/tools/review-pr.md:204</span>.</p>
 <h3 id="how-the-round-budget-is-enforced">How the round budget is enforced</h3>
 <p>Round-bounding is <strong>native</strong> to the engine. The wrappers pass <code>mmr review --session &#x3C;target>-cycle-&#x3C;C> --round &#x3C;N> --max-rounds 3</code>
-<span class="fp" data-path="content/tools/review-pr.md:103">content/tools/review-pr.md:103</span>, incrementing <code>--round</code> each fix round
+<span class="fp" data-path="content/tools/review-pr.md:112">content/tools/review-pr.md:112</span>, incrementing <code>--round</code> each fix round
 (<code>--round</code> is required — MMR compares it against <code>--max-rounds</code>, so without it
 every call is round 1 and the cap never fires). MMR enforces the budget using a
 stable, line-number-independent <code>finding_key</code>
