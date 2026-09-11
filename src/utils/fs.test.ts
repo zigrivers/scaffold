@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   atomicWriteFile, fileExists, ensureDir,
   getPackageSkillsDir, getPackageMethodologyDir, getPackagePipelineDir,
@@ -24,6 +24,7 @@ function tmpDir() {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks()
   for (const f of tmpFiles) {
     try { fs.rmSync(f, { force: true }) } catch { /* ignore */ }
     try { fs.rmSync(f + '.tmp', { force: true }) } catch { /* ignore */ }
@@ -46,6 +47,33 @@ describe('atomicWriteFile', () => {
     const p = tmpPath()
     atomicWriteFile(p, 'content')
     expect(fs.existsSync(p + '.tmp')).toBe(false)
+  })
+
+  it('does not publish a competing writer\'s partial data', () => {
+    const directory = tmpDir()
+    fs.mkdirSync(directory)
+    const target = path.join(directory, 'output.md')
+    const writeFile = fs.writeFileSync.bind(fs)
+    const rename = fs.renameSync.bind(fs)
+    let competing = false
+    vi.spyOn(fs, 'writeFileSync').mockImplementation((file, ...args) => {
+      if (competing) {
+        writeFile(file, 'Partial competing content', 'utf8')
+        throw new Error('Competing write failed')
+      }
+      return writeFile(file, ...args)
+    })
+    vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+      competing = true
+      expect(() => atomicWriteFile(target, 'Other complete content')).toThrow('Competing write failed')
+      competing = false
+      return rename(from, to)
+    })
+
+    atomicWriteFile(target, 'Complete content')
+
+    expect(fs.readFileSync(target, 'utf8')).toBe('Complete content')
+    expect(fs.readdirSync(directory)).toEqual(['output.md'])
   })
 
   it('overwrites an existing file', () => {

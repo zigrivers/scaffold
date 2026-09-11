@@ -250,12 +250,13 @@ describe('installAllSkills', () => {
     fs.mkdirSync(target, { recursive: true })
     fs.writeFileSync(marker, 'previous version')
     const writeFile = fs.writeFileSync.bind(fs)
-    const failure = vi.spyOn(fs, 'writeFileSync').mockImplementation((file, ...args) => {
-      if (file === page || file === page + '.tmp') {
-        writeFile(file, 'Incomplete page', 'utf8')
+    const rename = fs.renameSync.bind(fs)
+    const failure = vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+      if (to === page) {
+        writeFile(from, 'Incomplete page', 'utf8')
         throw new Error('Reference write interrupted')
       }
-      return writeFile(file, ...args)
+      return rename(from, to)
     })
 
     const result = installAllSkills(tmpDir)

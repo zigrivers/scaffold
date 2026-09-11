@@ -126,13 +126,11 @@ describe('atomic config write cost', () => {
       expect(renamedFrom).toBe(writtenPath)
       expect(renamedTo).toBe(configPath)
 
-      // Same directory, or the rename can cross a filesystem boundary and stop
-      // being atomic — a temp file under /tmp with the config on another mount
-      // would satisfy every assertion above while silently losing the guarantee
-      // the temp-then-rename dance exists to provide.
+      // A unique staging directory beneath the destination parent stays on
+      // the same filesystem; a global /tmp path could cross a mount boundary.
       expect(
-        path.dirname(writtenPath),
-        'the temp file must sit beside the config so the rename stays atomic',
+        path.dirname(path.dirname(writtenPath)),
+        'the staging directory must sit beside the config so the rename stays atomic',
       ).toBe(path.dirname(configPath))
     } finally {
       readSpy.mockRestore()

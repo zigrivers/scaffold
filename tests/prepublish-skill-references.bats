@@ -22,3 +22,30 @@ teardown() {
   [ -f skills/example/references/run.md ]
   [ "$(cat skills/example/references/run.md)" = 'Read CLAUDE.md.' ]
 }
+
+@test "prepublish fallback preserves complete output and cleans staging after render failure" {
+  cd "$WORK"
+  REAL_SED=$(command -v sed)
+  cat > "$WORK/bin/sed" <<'SCRIPT'
+#!/usr/bin/env bash
+if [[ "$2" == */"$FAIL_FILE" ]]; then
+  printf 'Incomplete page'
+  exit 1
+fi
+exec "$REAL_SED" "$@"
+SCRIPT
+  chmod +x "$WORK/bin/sed"
+  mkdir -p skills/example/references
+  for failed in SKILL.md references/run.md; do
+    printf 'Complete entry' > skills/example/SKILL.md
+    printf 'Complete reference' > skills/example/references/run.md
+    run env PATH="$WORK/bin:$PATH" REAL_SED="$REAL_SED" FAIL_FILE="$failed" bash "$SCRIPT"
+    [ "$status" -ne 0 ]
+    if [ "$failed" = SKILL.md ]; then
+      [ "$(cat skills/example/SKILL.md)" = 'Complete entry' ]
+    else
+      [ "$(cat skills/example/references/run.md)" = 'Complete reference' ]
+    fi
+    [ -z "$(find skills -name '.scaffold-publish.*' -print)" ]
+  done
+}

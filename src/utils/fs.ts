@@ -2,15 +2,16 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-/**
- * Atomically write content to a file using temp-file-then-rename pattern.
- * Write to <path>.tmp, then fs.renameSync to <path>.
- * Prevents corruption if process crashes mid-write.
- */
+/** Publish one complete file; unique staging keeps concurrent writers isolated. */
 export function atomicWriteFile(filePath: string, content: string): void {
-  const tmpPath = filePath + '.tmp'
-  fs.writeFileSync(tmpPath, content, 'utf8')
-  fs.renameSync(tmpPath, filePath)
+  const directory = fs.mkdtempSync(path.join(path.dirname(filePath), '.scaffold-write-'))
+  const tmpPath = path.join(directory, 'content.tmp')
+  try {
+    fs.writeFileSync(tmpPath, content, 'utf8')
+    fs.renameSync(tmpPath, filePath)
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true })
+  }
 }
 
 /** Check if a file or directory exists. */
