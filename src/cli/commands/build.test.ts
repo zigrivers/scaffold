@@ -282,7 +282,8 @@ describe('build command', () => {
       fs.writeFileSync(path.join(source, 'references/run.md'), 'Read {{INSTRUCTIONS_FILE}}.')
       await buildCommand.handler({ 'validate-only': false, force: false } as Parameters<typeof buildCommand.handler>[0])
       expect(process.exitCode).toBe(0)
-      expect(fs.readFileSync(path.join(packageRoot, 'skills/example/references/run.md'), 'utf8')).toBe('Read CLAUDE.md.')
+      const reference = path.join(packageRoot, 'skills/example/references/run.md')
+      expect(fs.readFileSync(reference, 'utf8')).toBe('Read CLAUDE.md.')
     } finally {
       fs.rmSync(packageRoot, { recursive: true, force: true })
       vi.mocked(getPackageRoot).mockReturnValue('/fake')

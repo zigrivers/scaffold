@@ -208,10 +208,12 @@ describe('installAllSkills', () => {
     }
     installAllSkills(tmpDir)
     for (const target of SKILL_TARGETS) {
-      expect(fs.readFileSync(path.join(tmpDir, target.installDir, 'scaffold-runner', 'references', 'execution.md'), 'utf8')).toBe('Local execution policy')
+      const page = path.join(tmpDir, target.installDir, 'scaffold-runner', 'references', 'execution.md')
+      expect(fs.readFileSync(page, 'utf8')).toBe('Local execution policy')
     }
     installAllSkills(tmpDir, { force: true })
-    expect(fs.readFileSync(path.join(tmpDir, '.agents/skills/scaffold-runner/references/execution.md'), 'utf8')).toBe('Read AGENTS.md before execution.')
+    const sharedPage = path.join(tmpDir, '.agents/skills/scaffold-runner/references/execution.md')
+    expect(fs.readFileSync(sharedPage, 'utf8')).toBe('Read AGENTS.md before execution.')
   })
 
   it('writes version markers', () => {

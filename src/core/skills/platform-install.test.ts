@@ -70,7 +70,7 @@ describe('installSkillsForPlatform', () => {
     expect(fs.readFileSync(skillPath, 'utf8')).toMatch(/^---\nname: scaffold-runner\n/)
   })
 
-  it.each(['codex', 'antigravity', 'cursor', 'opencode'] as const)('%s installs the workflow pages its skill links to', (platform) => {
+  it.each(['codex', 'antigravity', 'cursor', 'opencode'] as const)('%s bundles linked skill pages', (platform) => {
     const result = installSkillsForPlatform(tmp, platform)
     expect(result.errors).toEqual([])
     const host = platform === 'opencode' ? '.opencode' : '.agents'
