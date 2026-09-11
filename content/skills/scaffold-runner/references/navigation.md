@@ -57,7 +57,7 @@ Respond to these natural language requests:
 | "Skip X" | Run `scaffold skip <step> --reason "<user's reason>"` |
 | "Skip X, Y, and Z" | Run `scaffold skip <step1> <step2> <step3> --reason "<reason>"` |
 | "What's left?" / "Show remaining" | Run `scaffold status --compact`, show only pending/in-progress steps |
-| "Re-run X" / "Redo X" / "Go back to X" | Reset then re-run: `scaffold reset <step> --force && scaffold run <step>` |
+| "Re-run X" / "Redo X" / "Go back to X" | Reset with `scaffold reset <step> --force`, then follow the [execution lifecycle](execution.md) |
 | "Re-run all reviews" / "Redo quality gates" | Batch re-run — see [Batch Execution](batches.md#batch-execution) |
 | "Rework phases 1-5" / "Rework through phase 5" | `scaffold rework --through 5` — see [Rework Mode](rework.md#rework-mode) |
 | "Continue rework" / "Resume rework" | `scaffold rework --resume` — see [Rework Mode](rework.md#rework-mode) |
@@ -131,7 +131,7 @@ When running `review-user-stories` at depth 5, check if `codex` or `agy` (Antigr
 - Tier 2 (Persistent Memory): Configures MCP Knowledge Graph server (`@modelcontextprotocol/server-memory`), lifecycle hooks (PreCompact, Stop), and decision logging in `docs/decisions/`.
 - Tier 3 (External Context): Adds library documentation server (Context7/Nia/Docfork) to prevent API hallucination. Only relevant for projects with external dependencies.
 
-The step auto-detects installed MCP servers and presents tier choices as decision points. Brownfield detection: if `.claude/rules/` exists, enters update mode preserving user customizations.
+The step auto-detects installed MCP servers. Resolve tier choices from project and session context; ask only for a missing consequential choice or explicit approval under the [execution decision rules](execution.md#step-3-resolve-decisions-from-context). Brownfield detection: if `.claude/rules/` exists, enters update mode preserving user customizations.
 
 **`add-e2e-testing`** — Unified E2E testing step that auto-detects the platform:
 - Reads `docs/tech-stack.md` and `package.json` to determine web (Playwright), mobile (Maestro), or both

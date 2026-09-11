@@ -67,7 +67,7 @@ Batch plan: 7 steps to execute sequentially
 Session preferences: depth 4, carry forward decisions
 Estimated: autonomous execution, stops only on blockers
 
-Execution mode: continue within the requested batch; pause for unresolved decisions
+Execution mode: continue within the requested batch; pause for unresolved consequential choices or explicit approval gates
 ```
 
 6. **Use existing authorization**: An explicit request such as "run phases 5–8" authorizes that resolved batch. Show the ordered list and start. Ask before starting only when scope is ambiguous, the proposed list changes the request, or a repository rule or selected mode requires approval. Preserve already-approved preferences and per-step confirmation mode.

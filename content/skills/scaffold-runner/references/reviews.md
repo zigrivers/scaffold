@@ -64,4 +64,4 @@ Auth pre-flight for Path B dispatch:
 4. If any fail: `! codex login`, `! agy -p "hello"`, or `! claude login` (the `!` prefix runs it interactively with TTY access).
 5. **Never silently skip a CLI due to auth failure** — surface it to the user.
 
-Apply the existing review depth and session preferences. Ask about depth only when it is unresolved under the [execution decision rules](execution.md); explain that depth 4-5 enables the configured multi-model validation when the CLIs are available.
+Apply the existing review depth and session preferences. Ask about depth only when it is unresolved under the [execution decision rules](execution.md#step-3-resolve-decisions-from-context); explain that depth 4-5 enables the configured multi-model validation when the CLIs are available.
