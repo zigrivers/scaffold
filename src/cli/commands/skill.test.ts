@@ -10,7 +10,8 @@ vi.mock('../middleware/output-mode.js', () => ({
 }))
 
 // Mock getPackageRoot — sync.ts uses this internally via getSkillTemplateDir()
-vi.mock('../../utils/fs.js', () => ({
+vi.mock('../../utils/fs.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../utils/fs.js')>(),
   getPackageRoot: vi.fn(() => '/mock-package-root'),
 }))
 
