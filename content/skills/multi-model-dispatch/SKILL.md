@@ -175,14 +175,19 @@ If no findings, respond with: { "approved": true, "findings": [], "summary": "No
 ```
 You are reviewing a pull request diff. Report all P0, P1, P2, and P3 findings; the project's fix threshold is applied downstream.
 
-## Review Standards
-[paste docs/review-standards.md]
+## Applicable Project Rules
+[include the review policy and coding/test rules that apply to this diff, with
+source file paths and section or line references. Preserve required checks,
+review thresholds, security boundaries, and explicit team policies. Include a
+whole document when the affected scope requires it.]
 
-## Project Coding Standards
-[paste docs/coding-standards.md]
-
-## Test Standards
-[paste docs/tdd-standards.md]
+## Additional Context
+[provide repository paths for relevant supporting context that reviewers can
+read on demand. If a reviewer cannot access the repository, bundle the needed
+excerpts instead; do not rely on inaccessible paths. Report unresolved
+context gaps in the JSON summary without approving work that depends on missing
+evidence. The dispatching agent supplies that context before relying on the review;
+headless reviewers do not pause for an interactive response.]
 
 ## PR Diff
 [paste output of gh pr diff <number> or git diff origin/main...HEAD]

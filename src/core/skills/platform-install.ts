@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { getSkillTemplateDir, INSTALLABLE_SKILLS, resolveSkillTemplate } from './sync.js'
+import { atomicWriteFile } from '../../utils/fs.js'
+import { getSkillTemplateDir, getSkillReferenceFiles, INSTALLABLE_SKILLS, resolveSkillTemplate } from './sync.js'
 
 // All non-Claude hosts use AGENTS.md as their standing-instructions file, so the
 // skill templates' {{INSTRUCTIONS_FILE}} marker resolves to AGENTS.md for every
@@ -87,7 +88,7 @@ export function installSkillsForPlatform(
       }
     }
     fs.mkdirSync(path.dirname(target), { recursive: true })
-    fs.writeFileSync(target, body)
+    atomicWriteFile(target, body)
     installed.push(rel)
   }
 
@@ -106,12 +107,16 @@ export function installSkillsForPlatform(
           path.join('.cursor', 'rules', `${skill.name}.mdc`),
           loadResolved(templateDir, skill.name, 'cursor.mdc'),
         )
-      } else {
-        // opencode — the full Agent Skill (dir name must match the skill name).
+      }
+      // Lean hosts link to the shared full skill; OpenCode uses its native path.
+      // Keep its reference pages beside it so relative links work on every host.
+      const host = platform === 'opencode' ? '.opencode' : '.agents'
+      for (const file of ['SKILL.md', ...getSkillReferenceFiles(templateDir, skill.name)]) {
+        const relativePath = path.join(host, 'skills', skill.name, file)
         writeDedicated(
-          path.join(projectRoot, '.opencode', 'skills', skill.name, 'SKILL.md'),
-          path.join('.opencode', 'skills', skill.name, 'SKILL.md'),
-          loadResolved(templateDir, skill.name, 'SKILL.md'),
+          path.join(projectRoot, relativePath),
+          relativePath,
+          loadResolved(templateDir, skill.name, file),
         )
       }
     } catch (err) {

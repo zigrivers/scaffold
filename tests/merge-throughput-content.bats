@@ -4,6 +4,14 @@
 
 ROOT="$BATS_TEST_DIRNAME/.."
 
+# Keep the existing safeguard assertions over the complete linked skill bundle.
+setup() {
+  for tree in agent-skills skills; do
+    cat "$ROOT/content/$tree/work-beads/SKILL.md" \
+      "$ROOT/content/$tree/work-beads/references/"*.md > "$BATS_TEST_TMPDIR/$tree-work-beads.md"
+  done
+}
+
 # --- Task 4: knowledge entry ---
 @test "test-impact-analysis knowledge entry exists with dual-channel body" {
   F="$ROOT/content/knowledge/core/test-impact-analysis.md"
@@ -80,7 +88,7 @@ ROOT="$BATS_TEST_DIRNAME/.."
 
 # --- Task 10: work-beads skill ---
 @test "work-beads ship loop enqueues instead of merging when mq is installed" {
-  F="$ROOT/content/agent-skills/work-beads/SKILL.md"
+  F="$BATS_TEST_TMPDIR/agent-skills-work-beads.md"
   grep -q 'make mq-enqueue' "$F"
   grep -q 'merge-slot' "$F"   # the fallback branch must survive
   grep -q 'check-affected' "$F"
@@ -88,8 +96,8 @@ ROOT="$BATS_TEST_DIRNAME/.."
 
 @test "work-beads bounds review findings before creating follow-up beads" {
   for F in \
-    "$ROOT/content/agent-skills/work-beads/SKILL.md" \
-    "$ROOT/content/skills/work-beads/SKILL.md" \
+    "$BATS_TEST_TMPDIR/agent-skills-work-beads.md" \
+    "$BATS_TEST_TMPDIR/skills-work-beads.md" \
     "$ROOT/content/pipeline/environment/automated-pr-review.md" \
     "$ROOT/content/pipeline/environment/git-workflow.md"; do
     if grep -q "files beads for P2/P3" "$F" || \
@@ -102,7 +110,7 @@ ROOT="$BATS_TEST_DIRNAME/.."
     fi
   done
 
-  F="$ROOT/content/agent-skills/work-beads/SKILL.md"
+  F="$BATS_TEST_TMPDIR/agent-skills-work-beads.md"
   grep -q "severity label never creates a bead" "$F"
   grep -q "reproducible, actionable, non-duplicate, worth scheduling" "$F"
   grep -q "exactly one finite disposition" "$F"
@@ -122,8 +130,8 @@ ROOT="$BATS_TEST_DIRNAME/.."
 @test "round-three blocker starts a new bounded cycle after a concrete repair" {
   for F in \
     "$ROOT/docs/review-standards.md" \
-    "$ROOT/content/agent-skills/work-beads/SKILL.md" \
-    "$ROOT/content/skills/work-beads/SKILL.md" \
+    "$BATS_TEST_TMPDIR/agent-skills-work-beads.md" \
+    "$BATS_TEST_TMPDIR/skills-work-beads.md" \
     "$ROOT/content/pipeline/environment/automated-pr-review.md" \
     "$ROOT/content/pipeline/environment/git-workflow.md"; do
     NORMALIZED="$(tr '\n' ' ' < "$F" | sed -E 's/[[:space:]]+/ /g')"
@@ -146,8 +154,8 @@ ROOT="$BATS_TEST_DIRNAME/.."
   for F in \
     "$ROOT/docs/review-standards.md" \
     "$ROOT/content/tools/review-pr.md" \
-    "$ROOT/content/agent-skills/work-beads/SKILL.md" \
-    "$ROOT/content/skills/work-beads/SKILL.md"; do
+    "$BATS_TEST_TMPDIR/agent-skills-work-beads.md" \
+    "$BATS_TEST_TMPDIR/skills-work-beads.md"; do
     NORMALIZED="$(tr '\n' ' ' < "$F" | sed -E 's/[[:space:]]+/ /g')"
     [[ "$NORMALIZED" == *"Duplicate, stale, hypothetical, speculative, cosmetic, or already-dispositioned"* ]]
     [[ "$NORMALIZED" == *"cannot start a new cycle"* ]]
@@ -157,8 +165,8 @@ ROOT="$BATS_TEST_DIRNAME/.."
 @test "clean final exact head keeps every merge safeguard" {
   for F in \
     "$ROOT/docs/review-standards.md" \
-    "$ROOT/content/agent-skills/work-beads/SKILL.md" \
-    "$ROOT/content/skills/work-beads/SKILL.md"; do
+    "$BATS_TEST_TMPDIR/agent-skills-work-beads.md" \
+    "$BATS_TEST_TMPDIR/skills-work-beads.md"; do
     NORMALIZED="$(tr '\n' ' ' < "$F" | sed -E 's/[[:space:]]+/ /g')"
     for REQUIRED in \
       "final exact head" \
@@ -173,8 +181,8 @@ ROOT="$BATS_TEST_DIRNAME/.."
 
 @test "review-origin work cannot recursively create follow-up beads" {
   for F in \
-    "$ROOT/content/agent-skills/work-beads/SKILL.md" \
-    "$ROOT/content/skills/work-beads/SKILL.md"; do
+    "$BATS_TEST_TMPDIR/agent-skills-work-beads.md" \
+    "$BATS_TEST_TMPDIR/skills-work-beads.md"; do
     grep -q 'Review-origin work must not create recursive follow-up beads' "$F"
   done
 }
@@ -203,7 +211,7 @@ ROOT="$BATS_TEST_DIRNAME/.."
 }
 
 @test "work-beads stop guidance is self-contained and honors the user" {
-  F="$ROOT/content/agent-skills/work-beads/SKILL.md"
+  F="$BATS_TEST_TMPDIR/agent-skills-work-beads.md"
   ! grep -q "external conditions in Step 2.7" "$F"
   grep -q "the user asks to stop" "$F"
   grep -q "true external dependency" "$F"

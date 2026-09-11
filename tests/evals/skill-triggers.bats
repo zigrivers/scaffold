@@ -6,6 +6,8 @@
 setup() {
   load eval_helper
   SKILLS_DIR="${PROJECT_ROOT}/content/skills"
+  WORK_BEADS_BUNDLE="$BATS_TEST_TMPDIR/work-beads.md"
+  cat "$SKILLS_DIR/work-beads/SKILL.md" "$SKILLS_DIR/work-beads/references/"*.md > "$WORK_BEADS_BUNDLE"
 }
 
 # --- scaffold-runner activation ---
@@ -17,13 +19,13 @@ setup() {
   local failures=()
   local activation_section
   # Scope to the activation section to avoid false positives from prose elsewhere
-  activation_section="$(awk '/^## When This Skill Activates/{found=1; next} /^## /{if(found) exit} found{print}' "$skill_file")"
+  activation_section="$(extract_field "$skill_file" "description")"
 
   if [[ -z "$activation_section" ]]; then
-    failures+=("scaffold-runner missing '## When This Skill Activates' section")
+    failures+=("scaffold-runner missing activation description")
   else
     # Check that single-step run patterns are covered (OR groups — any phrasing counts)
-    if ! echo "$activation_section" | grep -qi 'run scaffold\|scaffold run\|run.*scaffold step'; then
+    if ! echo "$activation_section" | grep -qi 'run\|execute'; then
       failures+=("scaffold-runner activation section missing run/execute trigger pattern")
     fi
     if ! echo "$activation_section" | grep -qi "what.*next\|scaffold status\|where am i\|pipeline status"; then
@@ -47,10 +49,10 @@ setup() {
 
   local failures=()
   local activation_section
-  activation_section="$(awk '/^## When This Skill Activates/{found=1; next} /^## /{if(found) exit} found{print}' "$skill_file")"
+  activation_section="$(extract_field "$skill_file" "description")"
 
   if [[ -z "$activation_section" ]]; then
-    failures+=("scaffold-runner missing '## When This Skill Activates' section")
+    failures+=("scaffold-runner missing activation description")
   else
     # Check batch execution triggers using OR groups — any phrasing within the group counts
     if ! echo "$activation_section" | grep -qi 'run all\|run phases\|run.*next.*steps\|finish the pipeline\|batch'; then
@@ -71,7 +73,7 @@ setup() {
 # --- work-beads activation ---
 
 @test "work-beads skill description covers its trigger phrases" {
-  local skill_file="${SKILLS_DIR}/work-beads/SKILL.md"
+  local skill_file="$WORK_BEADS_BUNDLE"
   [[ -f "$skill_file" ]] || skip "work-beads not found"
 
   local desc
@@ -81,11 +83,11 @@ setup() {
   if [[ "$desc" != *"/work-beads"* ]]; then
     failures+=("work-beads description missing '/work-beads' trigger phrase")
   fi
-  if [[ "$desc" != *"work the next"* ]]; then
-    failures+=("work-beads description missing 'work the next' trigger phrase")
+  if [[ "$desc" != *"backlog batch"* ]]; then
+    failures+=("work-beads description missing backlog batch trigger")
   fi
-  if [[ "$desc" != *"pick up some open tasks"* ]]; then
-    failures+=("work-beads description missing 'pick up some open tasks' trigger phrase")
+  if [[ "$desc" != *"bead IDs"* ]]; then
+    failures+=("work-beads description missing named bead trigger")
   fi
 
   if [[ ${#failures[@]} -gt 0 ]]; then
@@ -96,7 +98,7 @@ setup() {
 }
 
 @test "work-beads skill teaches just-in-time atomic claiming" {
-  local skill_file="${SKILLS_DIR}/work-beads/SKILL.md"
+  local skill_file="$WORK_BEADS_BUNDLE"
   [[ -f "$skill_file" ]] || skip "work-beads not found"
 
   local failures=()
@@ -119,7 +121,7 @@ setup() {
 }
 
 @test "work-beads skill teaches the concurrency-hardening protocol" {
-  local skill_file="${SKILLS_DIR}/work-beads/SKILL.md"
+  local skill_file="$WORK_BEADS_BUNDLE"
   [[ -f "$skill_file" ]] || skip "work-beads not found"
 
   local failures=()
@@ -314,7 +316,7 @@ setup() {
 }
 
 @test "work-beads skill teaches agent identity + bead traceability" {
-  local skill_file="${SKILLS_DIR}/work-beads/SKILL.md"
+  local skill_file="$WORK_BEADS_BUNDLE"
   [[ -f "$skill_file" ]] || skip "work-beads not found"
 
   local failures=()

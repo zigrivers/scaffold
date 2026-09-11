@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { getPackageRoot } from '../../utils/fs.js'
+import { atomicWriteFile, getPackageRoot } from '../../utils/fs.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -47,7 +47,7 @@ export const SKILL_TARGETS: SkillTarget[] = [
 export const INSTALLABLE_SKILLS: SkillDefinition[] = [
   {
     name: 'scaffold-runner',
-    description: 'Interactive CLI wrapper that surfaces decision points before execution',
+    description: 'Run Scaffold pipeline steps, batches, rework, and tools',
   },
   {
     name: 'scaffold-pipeline',
@@ -88,6 +88,15 @@ export function getSkillTemplateDir(): string {
 // Core functions
 // ---------------------------------------------------------------------------
 
+/** Bundled reference pages are Markdown files directly inside references/. */
+export function getSkillReferenceFiles(templateDir: string, name: string): string[] {
+  const referenceDir = path.join(templateDir, name, 'references')
+  if (!fs.existsSync(referenceDir)) return []
+  return fs.readdirSync(referenceDir, { withFileTypes: true })
+    .filter(entry => entry.isFile() && entry.name.endsWith('.md'))
+    .map(entry => path.join('references', entry.name))
+}
+
 /**
  * Check `.scaffold-skill-version` markers in each target directory.
  * If any marker is missing or stale, reinstall all skills.
@@ -122,6 +131,7 @@ export function installAllSkills(projectRoot: string, options?: InstallOptions):
   const errors: string[] = []
 
   for (const target of SKILL_TARGETS) {
+    const errorsBeforeTarget = errors.length
     for (const skill of INSTALLABLE_SKILLS) {
       const sourcePath = path.join(templateDir, skill.name, 'SKILL.md')
 
@@ -131,29 +141,34 @@ export function installAllSkills(projectRoot: string, options?: InstallOptions):
       }
 
       const destDir = path.join(projectRoot, target.installDir, skill.name)
-      const destPath = path.join(destDir, 'SKILL.md')
-
-      if (fs.existsSync(destPath) && !force) {
-        // Already present and not forcing — still count it if it exists
-        continue
-      }
+      let wroteFile = false
 
       try {
-        fs.mkdirSync(destDir, { recursive: true })
-        const template = fs.readFileSync(sourcePath, 'utf8')
-        const resolved = resolveSkillTemplate(template, target.templateVars)
-        fs.writeFileSync(destPath, resolved, 'utf8')
-        installed++
+        for (const file of ['SKILL.md', ...getSkillReferenceFiles(templateDir, skill.name)]) {
+          const destination = path.join(destDir, file)
+          if (fs.existsSync(destination) && !force) continue
+          const template = fs.readFileSync(path.join(templateDir, skill.name, file), 'utf8')
+          const resolved = resolveSkillTemplate(template, target.templateVars)
+          fs.mkdirSync(path.dirname(destination), { recursive: true })
+          atomicWriteFile(destination, resolved)
+          wroteFile = true
+        }
+        if (wroteFile) installed++
       } catch (err) {
         errors.push(`Failed to install ${skill.name} to ${target.installDir}: ${err}`)
       }
     }
 
-    // Write version marker for this target
+    // A partial bundle must remain stale so automatic sync retries it.
     const targetDir = path.join(projectRoot, target.installDir)
+    const markerPath = path.join(targetDir, VERSION_MARKER_FILE)
     try {
+      if (errors.length > errorsBeforeTarget) {
+        fs.rmSync(markerPath, { force: true })
+        continue
+      }
       fs.mkdirSync(targetDir, { recursive: true })
-      fs.writeFileSync(path.join(targetDir, VERSION_MARKER_FILE), currentVersion, 'utf8')
+      fs.writeFileSync(markerPath, currentVersion, 'utf8')
     } catch (err) {
       errors.push(`Failed to write version marker to ${target.installDir}: ${err}`)
     }

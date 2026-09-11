@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -150,7 +152,7 @@ import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
 import { loadConfig } from '../../config/loader.js'
 import { discoverAllMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
-import { atomicWriteFile } from '../../utils/fs.js'
+import { atomicWriteFile, getPackageRoot } from '../../utils/fs.js'
 import { buildGraph } from '../../core/dependency/graph.js'
 import { detectCycles, topologicalSort } from '../../core/dependency/dependency.js'
 import { failWithErrors } from '../../cli/output/error-display.js'
@@ -265,6 +267,45 @@ describe('build command', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+  })
+
+  it('bundles resolved reference pages for plugin skill discovery', async () => {
+    vi.mocked(fs.existsSync).mockRestore()
+    vi.mocked(fs.mkdirSync).mockRestore()
+    const realFiles = await vi.importActual<typeof import('../../utils/fs.js')>('../../utils/fs.js')
+    mockAtomicWriteFile.mockImplementation(realFiles.atomicWriteFile)
+    const packageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'scaffold-plugin-skills-'))
+    vi.mocked(getPackageRoot).mockReturnValue(packageRoot)
+    mockFindProjectRoot.mockReturnValue(packageRoot)
+    try {
+      const source = path.join(packageRoot, 'content/skills/example')
+      fs.mkdirSync(path.join(source, 'references'), { recursive: true })
+      fs.writeFileSync(path.join(source, 'SKILL.md'), '[Run](references/run.md)')
+      fs.writeFileSync(path.join(source, 'references/run.md'), 'Read {{INSTRUCTIONS_FILE}}.')
+      await buildCommand.handler({ 'validate-only': false, force: false } as Parameters<typeof buildCommand.handler>[0])
+      expect(process.exitCode).toBe(0)
+      const reference = path.join(packageRoot, 'skills/example/references/run.md')
+      expect(fs.readFileSync(reference, 'utf8')).toBe('Read CLAUDE.md.')
+      const writeFile = fs.writeFileSync.bind(fs)
+      const rename = fs.renameSync.bind(fs)
+      const failure = vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+        if (to === reference) {
+          writeFile(from, 'Incomplete page', 'utf8')
+          throw new Error('Reference write interrupted')
+        }
+        return rename(from, to)
+      })
+      const args = { 'validate-only': false, force: false } as Parameters<typeof buildCommand.handler>[0]
+      await expect(buildCommand.handler(args)).rejects.toThrow('Reference write interrupted')
+      expect(fs.readFileSync(reference, 'utf8')).toBe('Read CLAUDE.md.')
+      failure.mockRestore()
+      await buildCommand.handler(args)
+      expect(fs.readFileSync(reference, 'utf8')).toBe('Read CLAUDE.md.')
+    } finally {
+      mockAtomicWriteFile.mockReset()
+      fs.rmSync(packageRoot, { recursive: true, force: true })
+      vi.mocked(getPackageRoot).mockReturnValue('/fake')
+    }
   })
 
   // Test 1: Exits 1 when project root not found

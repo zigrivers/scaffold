@@ -157,7 +157,7 @@ Install the Scaffold plugin inside Claude Code for auto-activated skills:
 ```
 
 This gives you five skills:
-- **Scaffold Runner skill** — intelligent interactive wrapper that surfaces decision points (depth level, strictness, optional sections) before execution instead of letting Claude pick defaults silently
+- **Scaffold Runner skill** — routes Scaffold requests to the relevant procedure, reuses approved decisions, and asks for unresolved consequential choices or required approvals
 - **Pipeline reference skill** — shows pipeline ordering, dependencies, and phase structure
 - **Multi-model dispatch skill** — correct invocation patterns for Codex and Antigravity CLIs
 - **MMR skill** — runs `mmr review` before merging, and `mmr critique` for design review
@@ -174,11 +174,18 @@ This gives you five skills:
 "Use depth 3 for everything"          → remembers preference for the session
 ```
 
-The plugin is optional — everything it does can also be done with `scaffold run <step>` from the CLI. But you lose the interactive decision surfacing without the Scaffold Runner skill.
+The plugin is optional — everything it does can also be done with `scaffold run <step>` from the CLI. The runner adds task routing and decision handling.
 
 > **CLI-only users**: If you prefer not to install the plugin, skills are installed automatically — `scaffold init` sets them up, and any subsequent CLI command keeps them current after upgrades. No manual `scaffold skill install` needed.
 
 > **Other agent CLIs**: the auto-install covers Claude Code (`.claude/skills/`) and shared/OpenCode hosts (`.agents/skills/`). To install the scaffold skills in another CLI's native form, run `scaffold skill install --platform <codex|antigravity|cursor|opencode>` — it writes a managed `AGENTS.md` block (Codex/Antigravity), `.cursor/rules/*.mdc` (Cursor), or `.opencode/skills/` (OpenCode).
+
+The Runner and Work Beads entry files load their detailed reference pages only
+when the matching task or phase needs them. Native Codex, Antigravity, and Cursor
+installs also include those full skills under `.agents/skills/`; OpenCode keeps
+them under `.opencode/skills/`. Existing dedicated files are preserved by default.
+Use `--force` only after reviewing project-specific edits you want to retain.
+
 
 ## Updating
 
