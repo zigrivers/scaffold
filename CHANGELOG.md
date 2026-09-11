@@ -4,6 +4,15 @@ All notable changes to Scaffold are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- Scaffold Runner and Work Beads now load detailed procedures by task or phase.
+  Runner reuses approved scope and decisions, repairs recoverable errors within
+  scope, and retains explicit approvals, sequential execution, and required gates.
+- Skill generation, native installs, and plugin bundles include linked reference
+  pages. Codex, Antigravity, and Cursor installs also include the full shared
+  skill. Existing dedicated files remain protected unless `--force` is supplied.
+
 ## [3.54.2] - 2026-08-31
 
 ### Changed

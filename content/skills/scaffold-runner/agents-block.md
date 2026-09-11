@@ -1,33 +1,21 @@
 # Scaffold Runner
 
-An interactive layer over the `scaffold` CLI: when the user asks to run a
-pipeline step, surface the step's decision points to the user **before**
-executing, then run it.
+Use this for requested Scaffold operations. A `.scaffold/` directory alone does
+not turn an ordinary coding request into a pipeline run.
 
-**Activates when** the user says "run scaffold &lt;step&gt;", "scaffold
-&lt;step&gt;", "what's next?", "scaffold status", "start building", is working
-in a project with a `.scaffold/` directory, or asks to set scaffold up in a
-project that has none yet.
+Reuse the current request, approved scope, recorded decisions, and session
+preferences. Ask for unresolved consequential choices or explicit approval gates;
+make routine implementation choices from project context. Continue authorized
+work after recoverable errors are repaired. Preserve required checks and
+security boundaries.
 
-**Before `.scaffold/` exists,** pick the bootstrap command from the directory
-rather than asking:
+Pipeline execution is sequential (ADR-021): one stateful step at a time. Use the
+CLI to check eligibility, assemble prompts, and record state. Never bypass its
+prerequisites. Build steps and utility tools are stateless: do not call
+`scaffold complete` for them.
 
-- Empty or brand-new directory → `scaffold init`.
-- Already has source code or docs → `scaffold adopt`, which initializes the
-  config and state itself and selects the `brownfield` methodology. It renders
-  a plan and writes nothing until you pass `--apply` with the approved
-  `--plan-key`.
-
-Never run `scaffold init` before `scaffold adopt` on an existing codebase:
-`init` would select the `deep` methodology and `adopt` would then replace it.
-
-**Core loop:** check `scaffold next` for what's eligible; before running a step,
-surface its decision points (depth, strictness, optional sections) to the user;
-then run it. For **stateful** pipeline steps, record completion with
-`scaffold complete <step>` — **build** steps (e.g. `single-agent-start`) are
-stateless and have no completion to record. Key commands: `scaffold list`,
-`scaffold status`, `scaffold next`, `scaffold run <step>`, `scaffold complete <step>`.
-
-For the full command surface, run `scaffold guides cli` (every command grouped
-by purpose) and `scaffold guides pipeline`; `scaffold next` shows what's eligible
-now.
+For status, run `scaffold status` (`--compact` for remaining work); for next
+steps, run `scaffold next`; for available tools, run `scaffold list --section tools`.
+These queries need no execution manual. For other requested operations, use the
+router in `.agents/skills/scaffold-runner/SKILL.md` when reading this as an
+AGENTS.md or Cursor rule.

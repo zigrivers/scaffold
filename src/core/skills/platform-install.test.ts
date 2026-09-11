@@ -70,6 +70,25 @@ describe('installSkillsForPlatform', () => {
     expect(fs.readFileSync(skillPath, 'utf8')).toMatch(/^---\nname: scaffold-runner\n/)
   })
 
+  it.each(['codex', 'antigravity', 'cursor', 'opencode'] as const)('%s installs the workflow pages its skill links to', (platform) => {
+    const result = installSkillsForPlatform(tmp, platform)
+    expect(result.errors).toEqual([])
+    const host = platform === 'opencode' ? '.opencode' : '.agents'
+    const skillDir = path.join(tmp, host, 'skills', 'scaffold-runner')
+    const body = fs.readFileSync(path.join(skillDir, 'SKILL.md'), 'utf8')
+    const links = [...body.matchAll(/\]\((references\/[^)]+\.md)\)/g)]
+    expect(links.length).toBeGreaterThan(0)
+    for (const [, reference] of links) {
+      expect(fs.readFileSync(path.join(skillDir, reference), 'utf8').length).toBeGreaterThan(0)
+    }
+    const page = path.join(skillDir, links[0][1])
+    fs.writeFileSync(page, 'Local workflow policy')
+    installSkillsForPlatform(tmp, platform)
+    expect(fs.readFileSync(page, 'utf8')).toBe('Local workflow policy')
+    installSkillsForPlatform(tmp, platform, { force: true })
+    expect(fs.readFileSync(page, 'utf8')).not.toBe('Local workflow policy')
+  })
+
   it('skips an existing dedicated file without --force, overwrites with it', () => {
     const mdc = path.join(tmp, '.cursor', 'rules', 'scaffold-runner.mdc')
     fs.mkdirSync(path.dirname(mdc), { recursive: true })

@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -150,7 +152,7 @@ import { resolveOutputMode } from '../middleware/output-mode.js'
 import { createOutputContext } from '../output/context.js'
 import { loadConfig } from '../../config/loader.js'
 import { discoverAllMetaPrompts } from '../../core/assembly/meta-prompt-loader.js'
-import { atomicWriteFile } from '../../utils/fs.js'
+import { atomicWriteFile, getPackageRoot } from '../../utils/fs.js'
 import { buildGraph } from '../../core/dependency/graph.js'
 import { detectCycles, topologicalSort } from '../../core/dependency/dependency.js'
 import { failWithErrors } from '../../cli/output/error-display.js'
@@ -265,6 +267,26 @@ describe('build command', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+  })
+
+  it('bundles resolved reference pages for plugin skill discovery', async () => {
+    vi.mocked(fs.existsSync).mockRestore()
+    vi.mocked(fs.mkdirSync).mockRestore()
+    const packageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'scaffold-plugin-skills-'))
+    vi.mocked(getPackageRoot).mockReturnValue(packageRoot)
+    mockFindProjectRoot.mockReturnValue(packageRoot)
+    try {
+      const source = path.join(packageRoot, 'content/skills/example')
+      fs.mkdirSync(path.join(source, 'references'), { recursive: true })
+      fs.writeFileSync(path.join(source, 'SKILL.md'), '[Run](references/run.md)')
+      fs.writeFileSync(path.join(source, 'references/run.md'), 'Read {{INSTRUCTIONS_FILE}}.')
+      await buildCommand.handler({ 'validate-only': false, force: false } as Parameters<typeof buildCommand.handler>[0])
+      expect(process.exitCode).toBe(0)
+      expect(fs.readFileSync(path.join(packageRoot, 'skills/example/references/run.md'), 'utf8')).toBe('Read CLAUDE.md.')
+    } finally {
+      fs.rmSync(packageRoot, { recursive: true, force: true })
+      vi.mocked(getPackageRoot).mockReturnValue('/fake')
+    }
   })
 
   // Test 1: Exits 1 when project root not found

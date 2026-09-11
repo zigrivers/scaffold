@@ -1,10 +1,9 @@
 # Work Beads
 
-Work the Beads queue with the ship loop. Multiple agents run this concurrently
-with no memory of each other — the loop is self-contained on purpose; do not
-skip steps.
+Work the requested Beads queue with the ship loop. Preserve the atomic claim,
+lease, verification, review, and queue contracts across agents.
 
-**The loop contract (memorize this):**
+**The loop contract:**
 
 ```
 set identity once, then repeat up to N times (one bead in flight per agent):
@@ -42,3 +41,5 @@ Invocation: `/work-beads` (1 bead) · `/work-beads N` (up to N beads, selected
 **one at a time at claim time** — N is a budget, not a reservation; never
 pre-pick a list) · `/work-beads N <label>` (same, scoped to a label) ·
 `/work-beads <id> [<id>...]` (explicit IDs, worked in dependency order).
+For the detailed phase procedures, load the router in
+`.agents/skills/work-beads/SKILL.md` when reading this as an AGENTS.md or Cursor rule.

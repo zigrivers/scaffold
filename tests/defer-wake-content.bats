@@ -8,7 +8,11 @@
 
 ROOT="$BATS_TEST_DIRNAME/.."
 MK="$ROOT/content/assets/agent-ops/make/agent-ops.mk.tmpl"
-SKILL="$ROOT/content/agent-skills/work-beads/SKILL.md"
+setup() {
+  SKILL="$BATS_TEST_TMPDIR/work-beads.md"
+  cat "$ROOT/content/agent-skills/work-beads/SKILL.md" \
+    "$ROOT/content/agent-skills/work-beads/references/"*.md > "$SKILL"
+}
 BEADS="$ROOT/content/pipeline/foundation/beads.md"
 
 # --- agent-ops.mk wiring (auto-wake) ---
@@ -83,5 +87,5 @@ BEADS="$ROOT/content/pipeline/foundation/beads.md"
 # --- doctrine specifically must reach the generated copy too) ---
 
 @test "generated work-beads skill carries the absolute-UTC release" {
-  grep -q 'date -u -v+1H' "$ROOT/content/skills/work-beads/SKILL.md"
+  grep -q 'date -u -v+1H' "$ROOT/content/skills/work-beads/references/claims.md"
 }

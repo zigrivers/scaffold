@@ -47,7 +47,7 @@ export const SKILL_TARGETS: SkillTarget[] = [
 export const INSTALLABLE_SKILLS: SkillDefinition[] = [
   {
     name: 'scaffold-runner',
-    description: 'Interactive CLI wrapper that surfaces decision points before execution',
+    description: 'Run Scaffold pipeline steps, batches, rework, and tools',
   },
   {
     name: 'scaffold-pipeline',
@@ -87,6 +87,15 @@ export function getSkillTemplateDir(): string {
 // ---------------------------------------------------------------------------
 // Core functions
 // ---------------------------------------------------------------------------
+
+/** Bundled reference pages are Markdown files directly inside references/. */
+export function getSkillReferenceFiles(templateDir: string, name: string): string[] {
+  const referenceDir = path.join(templateDir, name, 'references')
+  if (!fs.existsSync(referenceDir)) return []
+  return fs.readdirSync(referenceDir, { withFileTypes: true })
+    .filter(entry => entry.isFile() && entry.name.endsWith('.md'))
+    .map(entry => path.join('references', entry.name))
+}
 
 /**
  * Check `.scaffold-skill-version` markers in each target directory.
@@ -139,10 +148,13 @@ export function installAllSkills(projectRoot: string, options?: InstallOptions):
       }
 
       try {
-        fs.mkdirSync(destDir, { recursive: true })
-        const template = fs.readFileSync(sourcePath, 'utf8')
-        const resolved = resolveSkillTemplate(template, target.templateVars)
-        fs.writeFileSync(destPath, resolved, 'utf8')
+        for (const file of ['SKILL.md', ...getSkillReferenceFiles(templateDir, skill.name)]) {
+          const template = fs.readFileSync(path.join(templateDir, skill.name, file), 'utf8')
+          const resolved = resolveSkillTemplate(template, target.templateVars)
+          const destination = path.join(destDir, file)
+          fs.mkdirSync(path.dirname(destination), { recursive: true })
+          fs.writeFileSync(destination, resolved, 'utf8')
+        }
         installed++
       } catch (err) {
         errors.push(`Failed to install ${skill.name} to ${target.installDir}: ${err}`)

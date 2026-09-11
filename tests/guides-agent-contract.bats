@@ -34,7 +34,7 @@ RUNNER_SKILL_GEN="content/skills/scaffold-runner/SKILL.md"
 
 @test "canonical runner skill covers the pre-init bootstrap choice" {
   grep -q 'scaffold adopt' "$RUNNER_SKILL_SRC"
-  grep -q 'has none yet' "$RUNNER_SKILL_SRC"
+  grep -q 'setup is requested' "$RUNNER_SKILL_SRC"
   grep -q 'Never run `scaffold init` before `scaffold adopt`' "$RUNNER_SKILL_SRC"
 }
 
@@ -42,7 +42,7 @@ RUNNER_SKILL_GEN="content/skills/scaffold-runner/SKILL.md"
   # Guards the fan-out: canonical can be right while the generated consumer
   # files are stale. Assert the whole rule, not one phrase — a partial check
   # would pass on a half-regenerated file.
-  grep -q 'has none yet' "$RUNNER_SKILL_GEN"
+  grep -q 'setup is requested' "$RUNNER_SKILL_GEN"
   grep -q 'scaffold adopt' "$RUNNER_SKILL_GEN"
   grep -q 'Never run `scaffold init` before `scaffold adopt`' "$RUNNER_SKILL_GEN"
   grep -q -- '--plan-key' "$RUNNER_SKILL_GEN"

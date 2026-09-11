@@ -6,7 +6,7 @@
 // to (re)generate, or `--check` to fail when a committed file is stale (the drift
 // gate). One canonical source = one source of truth, so the per-platform files
 // can no longer drift apart.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -69,7 +69,16 @@ const normalize = (text) => text.replace(/\r\n/g, '\n')
 
 for (const skill of SKILLS) {
   const parsed = parseCanonicalSkill(readFileSync(resolve(ROOT, skill.source), 'utf8'))
-  for (const target of skill.targets) {
+  const referenceDir = resolve(ROOT, dirname(skill.source), 'references')
+  const referenceTargets = existsSync(referenceDir)
+    ? readdirSync(referenceDir, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
+      .map((entry) => ({
+        path: `content/skills/${parsed.name}/references/${entry.name}`,
+        render: () => readFileSync(resolve(referenceDir, entry.name), 'utf8'),
+      }))
+    : []
+  for (const target of [...skill.targets, ...referenceTargets]) {
     const out = target.render(parsed)
     const abs = resolve(ROOT, target.path)
     const current = existsSync(abs) ? readFileSync(abs, 'utf8') : null

@@ -15,8 +15,7 @@ files can no longer drift apart.
 | `packages/mmr/templates/skills/agents/<name>.md` | the lean body | `mmr skill install` → `AGENTS.md` block (Codex/Antigravity) |
 | `packages/mmr/templates/skills/cursor/<name>.mdc` | lean `.mdc` (frontmatter + body) | `mmr skill install` → Cursor |
 
-The **lean** form (for `AGENTS.md` / Cursor, which have no progressive
-disclosure) is the region between `<!-- lean:start -->` and `<!-- lean:end -->`
+The **lean** form (for `AGENTS.md` / Cursor standing instructions) is the region between `<!-- lean:start -->` and `<!-- lean:end -->`
 in the canonical source; the **full** form is the whole body.
 
 ## Editing
@@ -28,3 +27,18 @@ in the canonical source; the **full** form is the whole body.
 
 `make agent-skills-check` (part of `make check-all`, run in CI) fails if any
 generated target is out of date.
+
+## On-demand reference pages
+
+Keep the trigger description concise and the entry file a task or phase router.
+Store operational detail in `content/agent-skills/<name>/references/*.md` (flat
+Markdown files); the same generator copies these into `content/skills` and checks
+for drift. Full skill installations and plugin bundles include these pages and
+resolve `{{INSTRUCTIONS_FILE}}` inside them. Link from the entry using
+`references/<page>.md`, and between reference pages using `<page>.md`.
+
+Codex, Antigravity, and Cursor native installs also place the full skill and its
+references in `.agents/skills/<name>/`; their lean rules point there. OpenCode
+uses `.opencode/skills/<name>/`. Existing dedicated skill/reference files are
+preserved unless `--force` is requested. Review local customizations before a
+forced upgrade; automatic sync does not replace existing skill bundles.

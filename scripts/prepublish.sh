@@ -13,6 +13,11 @@ node dist/index.js build --root "$(pwd)" 2>/dev/null || {
     skill_name=$(basename "$skill_dir")
     mkdir -p "skills/$skill_name"
     sed 's/{{INSTRUCTIONS_FILE}}/CLAUDE.md/g' "$skill_dir/SKILL.md" > "skills/$skill_name/SKILL.md"
+    for reference in "$skill_dir"references/*.md; do
+      [ -f "$reference" ] || continue
+      mkdir -p "skills/$skill_name/references"
+      sed 's/{{INSTRUCTIONS_FILE}}/CLAUDE.md/g' "$reference" > "skills/$skill_name/references/$(basename "$reference")"
+    done
   done
 }
 

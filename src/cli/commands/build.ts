@@ -22,6 +22,7 @@ import { ensureScaffoldGitignore, findLegacyGeneratedOutputs } from '../../proje
 import fs from 'node:fs'
 import type { CommandResult } from '../../types/index.js'
 import { shutdown } from '../shutdown.js'
+import { getSkillReferenceFiles, resolveSkillTemplate } from '../../core/skills/sync.js'
 
 export interface BuildArgs {
   'validate-only': boolean
@@ -272,11 +273,12 @@ export async function runBuild(argv: BuildArgs, options: RunBuildOptions = {}): 
           if (shutdown.isShuttingDown) break
           const templatePath = path.join(skillTemplateDir, skillName, 'SKILL.md')
           if (!fs.existsSync(templatePath)) continue
-          const template = fs.readFileSync(templatePath, 'utf8')
-          const resolved = template.replace(/\{\{(\w+)\}\}/g, (match: string, key: string) => claudeVars[key] ?? match)
-          const outDir = path.join(skillOutputDir, skillName)
-          fs.mkdirSync(outDir, { recursive: true })
-          fs.writeFileSync(path.join(outDir, 'SKILL.md'), resolved, 'utf8')
+          for (const file of ['SKILL.md', ...getSkillReferenceFiles(skillTemplateDir, skillName)]) {
+            const template = fs.readFileSync(path.join(skillTemplateDir, skillName, file), 'utf8')
+            const destination = path.join(skillOutputDir, skillName, file)
+            fs.mkdirSync(path.dirname(destination), { recursive: true })
+            fs.writeFileSync(destination, resolveSkillTemplate(template, claudeVars), 'utf8')
+          }
         }
       }
 
