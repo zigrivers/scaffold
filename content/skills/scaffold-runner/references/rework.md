@@ -45,7 +45,7 @@ For each step in the rework session:
    ```bash
    scaffold run <step> --auto 2>&1
    ```
-5. Follow the normal Smart Scaffold Execution workflow (preview → extract decisions → execute)
+5. Follow the [execution lifecycle](execution.md): preview → resolve decisions from context → ask only if needed → execute
 6. After completion:
    ```bash
    scaffold rework --advance <step>    # Update rework session
@@ -64,7 +64,7 @@ If the rework config has `fresh: true`, delete the existing artifact before runn
 
 When `config.auto` is false (the default):
 - After completing the last step in a phase, pause execution
-- Show a phase summary (use the phase description from the reference table for context):
+- Show a phase summary (use the [phase name reference](batches.md#phase-name-reference) for context):
   ```
   Phase 1 (Product Definition) complete: 3/3 steps
   Translates your vision into a PRD with features, personas, and success criteria,
@@ -86,6 +86,6 @@ When `config.auto` is true, skip pauses and continue through all steps.
 ### Completion
 
 When `scaffold rework --advance` reports all steps done (returns `all_done: true` in JSON):
-1. Show the full rework summary (similar to batch summary)
+1. Show the full rework summary using the [batch summary format](batches.md#batch-summary)
 2. The session file is automatically cleaned up by the CLI
 3. Show overall pipeline status via `scaffold status`

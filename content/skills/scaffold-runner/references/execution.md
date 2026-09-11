@@ -47,7 +47,7 @@ Now execute the assembled prompt as your working instructions. This means:
 
 1. Read the assembled prompt output from Step 2
 2. Follow its instructions section by section
-3. Where the prompt says "ask the user about X", substitute the answer from Step 4
+3. Where the prompt asks about X, use the applicable answer from the request, prior approval, or Step 4
 4. Where the prompt says "use AskUserQuestionTool", use the applicable answer from the request, prior approval, or Step 4 instead
 5. Perform all file operations, artifact creation, and validation the prompt describes
 
@@ -93,7 +93,9 @@ If no prior activity is detected, suggest `single-agent-start` or `multi-agent-s
 
 ## Tool Execution
 
-Tools (version-bump, release, version, update, dashboard, prompt-pipeline, session-analyzer, review-code, review-pr, post-implementation-review) are utility commands orthogonal to the pipeline.
+Prompt-backed tools (version-bump, release, version, update, prompt-pipeline, session-analyzer, review-code, review-pr, post-implementation-review) are utility commands orthogonal to the pipeline.
+
+Direct CLI utilities such as `scaffold dashboard` run through their own command; they do not use the prompt lifecycle below.
 
 ### Differences from Pipeline Steps
 
@@ -105,7 +107,7 @@ Tools (version-bump, release, version, update, dashboard, prompt-pipeline, sessi
 
 1. **Skip eligibility** — don't run `scaffold next` to check
 2. **Preview** — `scaffold run <tool> --auto 2>&1` (same as pipeline steps)
-3. **Extract decisions** — same process as pipeline steps
+3. **Resolve decisions** — apply Steps 3–4 above; reuse settled answers and ask only for missing consequential choices or explicit approvals
 4. **Execute** — follow the assembled prompt faithfully
 5. **No completion** — skip `scaffold complete`, skip "what's next"
 
@@ -125,7 +127,7 @@ Track these preferences within the current session to avoid re-asking:
 | Default depth | "Use depth 3 for everything" | Remember and apply to all steps |
 | Skip optional steps | "Skip design system, I don't have a frontend" | Batch skip with `scaffold skip <step1> <step2> --reason "..."` |
 | Methodology | "I'm using MVP" | Informs default recommendations |
-| Batch mode | "Run the next 3 steps" | Execute sequentially, surface decisions for each |
+| Batch mode | "Run the next 3 steps" | Execute sequentially, reuse settled decisions, ask only when needed under Steps 3–4 |
 | Compact status | User is mid-pipeline, only cares about remaining work | Default to `scaffold status --compact` |
 | Pre-push review | "Run review-code before committing and pushing" | Remember to insert `scaffold run review-code` before `git push` in build flows |
 

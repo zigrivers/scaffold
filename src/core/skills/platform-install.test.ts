@@ -79,7 +79,20 @@ describe('installSkillsForPlatform', () => {
     const links = [...body.matchAll(/\]\((references\/[^)]+\.md)\)/g)]
     expect(links.length).toBeGreaterThan(0)
     for (const [, reference] of links) {
-      expect(fs.readFileSync(path.join(skillDir, reference), 'utf8').length).toBeGreaterThan(0)
+      const page = path.join(skillDir, reference)
+      const content = fs.readFileSync(page, 'utf8')
+      expect(content.length).toBeGreaterThan(0)
+      for (const [, target] of content.matchAll(/\]\(([^)]+)\)/g)) {
+        if (!target.startsWith('#') && !/^[^:]+\.md(?:#.*)?$/.test(target)) continue
+        const [file, fragment] = target.split('#')
+        const linkedPage = file ? path.resolve(path.dirname(page), file) : page
+        const linkedContent = fs.readFileSync(linkedPage, 'utf8')
+        if (fragment) {
+          const headings = [...linkedContent.matchAll(/^#{1,6} (.+)$/gm)]
+            .map(([, heading]) => heading.toLowerCase().replace(/[^\w -]/g, '').replace(/ /g, '-'))
+          expect(headings, `${page} links to missing ${target}`).toContain(fragment)
+        }
+      }
     }
     const page = path.join(skillDir, links[0][1])
     fs.writeFileSync(page, 'Local workflow policy')

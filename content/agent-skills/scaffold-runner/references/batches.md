@@ -18,7 +18,9 @@ Map natural language requests to concrete step lists using `scaffold status` out
 | "Run validation checks" | All steps in the `validation` phase |
 | "Finish the pipeline" | All remaining pending steps, in dependency order |
 
-**Phase name reference** (for resolving phase-based requests):
+### Phase Name Reference
+
+For resolving phase-based requests:
 
 | Phase Name | Also Known As | Description | Steps |
 |---|---|---|---|
@@ -85,7 +87,7 @@ For each step in the batch:
 #### B. Execution
 
 4. **Capture prompt**: `scaffold run <step> --auto 2>&1`
-5. **Extract decisions**: Scan for decision points (same as single-step workflow)
+5. **Resolve decisions**: Use the [execution decision rules](execution.md#step-3-resolve-decisions-from-context) to distinguish settled choices, routine details, and missing consequential decisions
 6. **Apply session preferences**: If the user already set depth, strictness, or other preferences earlier in the batch (or in session preferences), substitute those answers without re-asking
 7. **Resolve new decisions**: Apply the decision rules in [execution.md](execution.md). Ask only for missing consequential choices or explicit approval gates; choose routine implementation details from project context.
 8. **Execute the prompt**: Follow the assembled prompt faithfully
@@ -124,7 +126,7 @@ Within a batch, decisions made for early steps carry forward to later steps:
 | Technology choices | All steps | "Use PostgreSQL" remembered for all steps that ask about DB |
 | Skip patterns | All steps | "Skip frontend sections" applied wherever relevant |
 
-When a new step has a decision point that matches a carried-forward preference, substitute the answer silently. Only surface the decision if it's genuinely new or if context has changed (e.g., a previous step's output contradicts an earlier decision).
+When a new step has a decision point that matches a carried-forward preference, substitute the answer silently. Re-evaluate when context changes (for example, a prior output contradicts an earlier decision); ask only for an unresolved consequential choice or explicit approval under the execution rules.
 
 ### Batch Summary
 

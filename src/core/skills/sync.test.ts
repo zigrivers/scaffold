@@ -206,6 +206,8 @@ describe('installAllSkills', () => {
       expect(fs.readFileSync(page, 'utf8')).toBe(`Read ${target.templateVars.INSTRUCTIONS_FILE} before execution.`)
       fs.writeFileSync(page, 'Local execution policy')
     }
+    // A missing entry file must not make an existing local reference disposable.
+    fs.unlinkSync(path.join(tmpDir, '.agents/skills/scaffold-runner/SKILL.md'))
     installAllSkills(tmpDir)
     for (const target of SKILL_TARGETS) {
       const page = path.join(tmpDir, target.installDir, 'scaffold-runner', 'references', 'execution.md')

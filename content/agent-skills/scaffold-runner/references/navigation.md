@@ -52,17 +52,17 @@ Respond to these natural language requests:
 | "Is X applicable?" / "Do I need X?" | Run `scaffold check <step>` to detect platform and brownfield status |
 | "Set up memory" / "Configure AI memory" / "Add memory" | Run `scaffold run ai-memory-setup` — sets up modular rules, optional MCP memory server, and external context |
 | "Set up testing" / "Add Playwright" / "Add Maestro" | Run `scaffold run add-e2e-testing` — auto-detects web/mobile and configures the right framework(s) |
-| "Run multi-model review" / "Review X with all three models" | Route by target — see [Multi-Model Review Routing](#multi-model-review-routing) |
+| "Run multi-model review" / "Review X with all three models" | Route by target — see [Multi-Model Review Routing](reviews.md#multi-model-review-routing) |
 | "Review stories with other models" | Run `scaffold run review-user-stories` at depth 5 (multi-model capabilities are built into review-user-stories) |
 | "Skip X" | Run `scaffold skip <step> --reason "<user's reason>"` |
 | "Skip X, Y, and Z" | Run `scaffold skip <step1> <step2> <step3> --reason "<reason>"` |
 | "What's left?" / "Show remaining" | Run `scaffold status --compact`, show only pending/in-progress steps |
 | "Re-run X" / "Redo X" / "Go back to X" | Reset then re-run: `scaffold reset <step> --force && scaffold run <step>` |
-| "Re-run all reviews" / "Redo quality gates" | Batch re-run — see [Batch Execution](#batch-execution) |
-| "Rework phases 1-5" / "Rework through phase 5" | `scaffold rework --through 5` — see [Rework Mode](#rework-mode) |
-| "Continue rework" / "Resume rework" | `scaffold rework --resume` — see [Rework Mode](#rework-mode) |
-| "Run phases 5-8" / "Run modeling through specs" | Batch run by phase range — see [Batch Execution](#batch-execution) |
-| "Run the next N steps" / "Finish the pipeline" | Batch forward run — see [Batch Execution](#batch-execution) |
+| "Re-run all reviews" / "Redo quality gates" | Batch re-run — see [Batch Execution](batches.md#batch-execution) |
+| "Rework phases 1-5" / "Rework through phase 5" | `scaffold rework --through 5` — see [Rework Mode](rework.md#rework-mode) |
+| "Continue rework" / "Resume rework" | `scaffold rework --resume` — see [Rework Mode](rework.md#rework-mode) |
+| "Run phases 5-8" / "Run modeling through specs" | Batch run by phase range — see [Batch Execution](batches.md#batch-execution) |
+| "Run the next N steps" / "Finish the pipeline" | Batch forward run — see [Batch Execution](batches.md#batch-execution) |
 | "Continue the batch" / "Resume" | Resume an interrupted batch from where it stopped |
 | "Mark X as done" / "Complete X" | Run `scaffold complete <step>` — marks a step as completed when executed outside `scaffold run` |
 | "Reset X" / "Reset X to pending" | Run `scaffold reset <step>`, confirm if completed |
@@ -85,7 +85,7 @@ Respond to these natural language requests:
 When the user wants to re-run a completed step (e.g., "re-run the PRD", "redo create-prd", "I want to update my user stories"):
 
 1. **Reset the step to pending**: Run `scaffold reset <step> --force`
-2. **Then run it**: Follow the normal Smart Scaffold Execution workflow (preview → resolve decisions → ask only if needed → execute)
+2. **Then run it**: Follow [execution](execution.md) (preview → resolve decisions → ask only if needed → execute)
 3. The step will run in **update mode** — it detects the existing artifact and updates it rather than starting from scratch
 
 This is useful when:
@@ -117,7 +117,7 @@ Use the full `scaffold status` (without `--compact`) when the user asks for a co
 
 ### Depth-Aware Steps
 
-Some steps behave significantly differently at higher depths. When running these steps, surface the depth choice as a decision point:
+Some steps behave significantly differently at higher depths. Reuse the approved depth or project preset. Ask only about a missing consequential choice under the [execution decision rules](execution.md#step-3-resolve-decisions-from-context):
 
 **`review-user-stories`** — The review step scales with depth:
 - Depth 1-3: Claude-only multi-pass review (6 review passes)

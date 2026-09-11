@@ -149,9 +149,10 @@ export function installAllSkills(projectRoot: string, options?: InstallOptions):
 
       try {
         for (const file of ['SKILL.md', ...getSkillReferenceFiles(templateDir, skill.name)]) {
+          const destination = path.join(destDir, file)
+          if (fs.existsSync(destination) && !force) continue
           const template = fs.readFileSync(path.join(templateDir, skill.name, file), 'utf8')
           const resolved = resolveSkillTemplate(template, target.templateVars)
-          const destination = path.join(destDir, file)
           fs.mkdirSync(path.dirname(destination), { recursive: true })
           fs.writeFileSync(destination, resolved, 'utf8')
         }

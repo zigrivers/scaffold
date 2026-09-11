@@ -59,7 +59,7 @@ Applies to: some older depth-5 validation steps and any ad-hoc manual dispatch n
 
 Auth pre-flight for Path B dispatch:
 1. Codex: `codex login status`
-2. Antigravity: `agy -p "respond with ok" --print-timeout 12s` (auth failure is detected from authentication sentinel text)
+2. Antigravity: `agy -p "respond with ok" --print-timeout 12s`. Treat output containing `authentication required` or `authentication timed out` as auth failure even when the exit code is zero.
 3. Claude CLI: `claude -p "respond with ok"` (typically uses the active Claude Code session)
 4. If any fail: `! codex login`, `! agy -p "hello"`, or `! claude login` (the `!` prefix runs it interactively with TTY access).
 5. **Never silently skip a CLI due to auth failure** — surface it to the user.
