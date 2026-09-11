@@ -131,6 +131,7 @@ export function installAllSkills(projectRoot: string, options?: InstallOptions):
   const errors: string[] = []
 
   for (const target of SKILL_TARGETS) {
+    const errorsBeforeTarget = errors.length
     for (const skill of INSTALLABLE_SKILLS) {
       const sourcePath = path.join(templateDir, skill.name, 'SKILL.md')
 
@@ -140,12 +141,7 @@ export function installAllSkills(projectRoot: string, options?: InstallOptions):
       }
 
       const destDir = path.join(projectRoot, target.installDir, skill.name)
-      const destPath = path.join(destDir, 'SKILL.md')
-
-      if (fs.existsSync(destPath) && !force) {
-        // Already present and not forcing — still count it if it exists
-        continue
-      }
+      let wroteFile = false
 
       try {
         for (const file of ['SKILL.md', ...getSkillReferenceFiles(templateDir, skill.name)]) {
@@ -155,18 +151,24 @@ export function installAllSkills(projectRoot: string, options?: InstallOptions):
           const resolved = resolveSkillTemplate(template, target.templateVars)
           fs.mkdirSync(path.dirname(destination), { recursive: true })
           fs.writeFileSync(destination, resolved, 'utf8')
+          wroteFile = true
         }
-        installed++
+        if (wroteFile) installed++
       } catch (err) {
         errors.push(`Failed to install ${skill.name} to ${target.installDir}: ${err}`)
       }
     }
 
-    // Write version marker for this target
+    // A partial bundle must remain stale so automatic sync retries it.
     const targetDir = path.join(projectRoot, target.installDir)
+    const markerPath = path.join(targetDir, VERSION_MARKER_FILE)
     try {
+      if (errors.length > errorsBeforeTarget) {
+        fs.rmSync(markerPath, { force: true })
+        continue
+      }
       fs.mkdirSync(targetDir, { recursive: true })
-      fs.writeFileSync(path.join(targetDir, VERSION_MARKER_FILE), currentVersion, 'utf8')
+      fs.writeFileSync(markerPath, currentVersion, 'utf8')
     } catch (err) {
       errors.push(`Failed to write version marker to ${target.installDir}: ${err}`)
     }

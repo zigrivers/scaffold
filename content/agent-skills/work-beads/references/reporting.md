@@ -39,8 +39,8 @@ If the batch ran long and `launchpad` is installed: `launchpad notify "<summary>
 | Start bead k+1 before bead k reaches its delivery finish line | With the queue, verify enqueue acceptance before moving on; without it, verify merge first |
 | Skip the draft PR "until it's ready" | The draft IS the claim other agents see |
 | End the turn after the draft PR with "next steps" | #1 observed agent failure — finish the loop |
-| Leave work accepted for follow-up under 2.5 as a TODO/FIXME comment | That work is a bead, filed now |
-| File a bead because a reviewer called something P2/P3 | Severity is not task authority; apply all five gates in 2.7 |
+| Leave work accepted for follow-up under [shipping step 2.5](shipping.md) as a TODO/FIXME comment | That work is a bead, filed now |
+| File a bead because a reviewer called something P2/P3 | Severity is not task authority; apply all five gates in [shipping step 2.7](shipping.md) |
 | Merge with a red `make check` or a required defect | Fix or block; a future bead cannot make the current PR safe |
 | Chase a cosmetically clean review | Stop dispatching once every root cause has a disposition and no verified fix-now or block item remains; a real repaired blocker starts a fresh bounded cycle |
 | Leave a staging stack you started running | `make staging-down` from the worktree before merging (only if you ran `staging-up`; never from the primary — it refuses there, and `prune-merged` reclaims it too) |
@@ -52,13 +52,13 @@ If the batch ran long and `launchpad` is installed: `launchpad notify "<summary>
 | Claim without a per-agent `BEADS_ACTOR` | Same-actor claims are idempotent — two agents sharing the default identity both "own" the bead |
 | Retry a lost claim | Normal traffic at high parallelism — take the next candidate |
 | Validate a bead before claiming it | Claim first — validation reads shared state; holding the claim hides the bead from peers while you decide |
-| Release a rejected bead straight to `--status open` | Persistent dup/conflict → the fleet re-claims/re-rejects it forever; cooldown-release with an ABSOLUTE UTC `--defer "$until_ts"` instead (see 2.1c) |
-| Skip or park a bead because its `Owner` is another agent | `Owner` is the immutable CREATOR, not an assignee — it names a departed agent forever. Only `Assignee` + `in_progress` holds a bead (Step 1) |
-| Honor an existing park note without re-resolving what it cites | Park notes go stale silently; a "recheck: still parked" line you did not verify is the ratchet that freezes a backlog (2.1b) |
-| `bd update <id> --notes "..."` on an existing bead | `--notes` REPLACES — it can destroy a bead's whole investigation history in one command. Use `bd note` / `--append-notes` (2.1c) |
-| Defer with a reason like "not autonomously shippable this session" | That is your capacity, not the bead's state — unfalsifiable, so it can never be cleared. Name a PR/bead/branch/command and the re-check condition (2.1c) |
-| Mass-defer beads to empty `bd ready` | An empty queue is not the goal. Deferring more beads than you worked is a stop-and-report signal, not a session outcome (2.1c) |
-| Cooldown-release the same bead a third time | 2+ prior cooldown notes for one cause = it will not clear itself — `Wait:` note + human triage instead of an hourly claim→reject cycle (2.1c) |
+| Release a rejected bead straight to `--status open` | Persistent dup/conflict → the fleet re-claims/re-rejects it forever; cooldown-release with an ABSOLUTE UTC `--defer "$until_ts"` instead (see [claim recovery](claims.md)) |
+| Skip or park a bead because its `Owner` is another agent | `Owner` is the immutable CREATOR, not an assignee — it names a departed agent forever. Only `Assignee` + `in_progress` holds a bead (see [queue selection](queue.md)) |
+| Honor an existing park note without re-resolving what it cites | Park notes go stale silently; a "recheck: still parked" line you did not verify is the ratchet that freezes a backlog (see [claim validation](claims.md)) |
+| `bd update <id> --notes "..."` on an existing bead | `--notes` REPLACES — it can destroy a bead's whole investigation history in one command. Use `bd note` / `--append-notes` (see [claim recovery](claims.md)) |
+| Defer with a reason like "not autonomously shippable this session" | That is your capacity, not the bead's state — unfalsifiable, so it can never be cleared. Name a PR/bead/branch/command and the re-check condition (see [claim recovery](claims.md)) |
+| Mass-defer beads to empty `bd ready` | An empty queue is not the goal. Deferring more beads than you worked is a stop-and-report signal, not a session outcome (see [claim recovery](claims.md)) |
+| Cooldown-release the same bead a third time | 2+ prior cooldown notes for one cause = it will not clear itself — `Wait:` note + human triage instead of an hourly claim→reject cycle (see [claim recovery](claims.md)) |
 | Pre-filter the queue to your capability slice | Rank the WHOLE queue; capability fit is a within-tier tie-break only — an out-of-slice P0 beats an in-slice P2 |
 | Reap/release another agent's stranded bead by hand | Surface it in the reaper report; releasing a claim is an `--apply`/operator decision |
 | Bootstrap/reset a populated `.beads` DB | Wipes unpushed beads — fresh clones only; push first (`bd dolt commit && bd dolt push`) |

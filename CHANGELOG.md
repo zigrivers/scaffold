@@ -9,6 +9,8 @@ All notable changes to Scaffold are documented here.
 - Scaffold Runner and Work Beads now load detailed procedures by task or phase.
   Runner reuses approved scope and decisions, repairs recoverable errors within
   scope, and retains explicit approvals, sequential execution, and required gates.
+- Multi-model PR review bundles applicable policy excerpts with source references
+  and includes required context when reviewers cannot access the repository.
 - Skill generation, native installs, and plugin bundles include linked reference
   pages. Codex, Antigravity, and Cursor installs also include the full shared
   skill. Existing dedicated files remain protected unless `--force` is supplied.

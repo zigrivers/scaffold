@@ -131,11 +131,11 @@ epic-sibling re-poll — are **validation gates that run AFTER the claim** (Step
 2.1): claim first so the bead is invisible to peers while you evaluate it.
 
 Queue drained (or no candidate survives) before the budget is spent? The batch
-ends early — go to Step 3 and report `queue drained after <k> of N`.
+ends early — go to [the batch report](reporting.md) and report `queue drained after <k> of N`.
 
 For explicit-ID invocations: topologically sort the listed IDs by dependency
 (blockers first); stop and report if they form a cycle. Before claiming each
-ID at its turn (Step 2.1), re-verify its blockers are all closed
+ID at its turn ([claim and validation](claims.md)), re-verify its blockers are all closed
 (`bd show <id>`): an ID already claimed by another agent is skipped and
 reported with its holder, and every listed ID that depends on a skipped or
 still-open blocker is skipped too (report as `blocked by <id>`) — never

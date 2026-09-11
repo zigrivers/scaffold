@@ -218,6 +218,52 @@ describe('installAllSkills', () => {
     expect(fs.readFileSync(sharedPage, 'utf8')).toBe('Read AGENTS.md before execution.')
   })
 
+  it('completes an interrupted bundle while preserving existing files', () => {
+    seedSkillTemplates(packageRoot)
+    const source = path.join(packageRoot, 'content/skills/scaffold-runner/references')
+    fs.mkdirSync(source)
+    fs.writeFileSync(path.join(source, 'execution.md'), 'Read {{INSTRUCTIONS_FILE}}.')
+    fs.writeFileSync(path.join(source, 'recovery.md'), 'Bundled recovery')
+    const destination = path.join(tmpDir, '.agents/skills/scaffold-runner')
+    fs.mkdirSync(path.join(destination, 'references'), { recursive: true })
+    fs.writeFileSync(path.join(destination, 'SKILL.md'), 'Local entry')
+    fs.writeFileSync(path.join(destination, 'references/recovery.md'), 'Local recovery')
+
+    const result = installAllSkills(tmpDir)
+
+    expect(result.errors).toEqual([])
+    expect(fs.readFileSync(path.join(destination, 'references/execution.md'), 'utf8')).toBe('Read AGENTS.md.')
+    expect(fs.readFileSync(path.join(destination, 'SKILL.md'), 'utf8')).toBe('Local entry')
+    expect(fs.readFileSync(path.join(destination, 'references/recovery.md'), 'utf8')).toBe('Local recovery')
+    expect(installAllSkills(tmpDir).installed).toBe(0)
+  })
+
+  it('leaves a failed target stale so automatic sync can finish its bundle', () => {
+    seedSkillTemplates(packageRoot)
+    const source = path.join(packageRoot, 'content/skills/scaffold-runner/references')
+    fs.mkdirSync(source)
+    fs.writeFileSync(path.join(source, 'execution.md'), 'Read {{INSTRUCTIONS_FILE}}.')
+    const target = path.join(tmpDir, '.agents/skills')
+    const marker = path.join(target, '.scaffold-skill-version')
+    const page = path.join(target, 'scaffold-runner/references/execution.md')
+    fs.mkdirSync(target, { recursive: true })
+    fs.writeFileSync(marker, 'previous version')
+    const writeFile = fs.writeFileSync.bind(fs)
+    const failure = vi.spyOn(fs, 'writeFileSync').mockImplementation((file, ...args) => {
+      if (file === page) throw new Error('Reference write interrupted')
+      return writeFile(file, ...args)
+    })
+
+    const result = installAllSkills(tmpDir)
+
+    expect(result.errors).toHaveLength(1)
+    expect(fs.existsSync(marker)).toBe(false)
+    failure.mockRestore()
+    syncSkillsIfNeeded(tmpDir)
+    expect(fs.readFileSync(page, 'utf8')).toBe('Read AGENTS.md.')
+    expect(fs.existsSync(marker)).toBe(true)
+  })
+
   it('writes version markers', () => {
     seedSkillTemplates(packageRoot)
 

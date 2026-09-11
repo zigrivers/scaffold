@@ -98,9 +98,9 @@ c. **On a gate REJECT** (you hold it, but it is a dup/conflict — a PERSISTENT
    clear on its own — do NOT re-defer. Append a `Wait:` note naming exactly
    what must change (`Wait: resolve duplicate against <id> — human triage`);
    the sweeper holds `Wait:` beads, so it stays parked deliberately. Report it
-   in the Step 3 slots for human triage.
+   in the [batch report slots](reporting.md) for human triage.
 
-d. **All gates pass → this is your bead.** Go to worktree setup (2.2).
+d. **All gates pass → this is your bead.** Continue with [worktree setup and shipping](shipping.md).
 
 **Generic no-ranking path (§4.2):** for a bare `/work-beads` (or a materialized
 plan queue via `--has-metadata-key plan_task_id`, or a label scope) you MAY
