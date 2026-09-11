@@ -73,27 +73,27 @@ describe('installSkillsForPlatform', () => {
 
   it.each(['codex', 'antigravity', 'cursor', 'opencode'] as const)(
     '%s preserves a reference after partial write failure', (platform) => {
-    installSkillsForPlatform(tmp, platform)
-    const host = platform === 'opencode' ? '.opencode' : '.agents'
-    const page = path.join(tmp, host, 'skills/scaffold-runner/references/execution.md')
-    const expected = fs.readFileSync(page, 'utf8')
-    fs.writeFileSync(page, 'Local execution policy')
-    const writeFile = fs.writeFileSync.bind(fs)
-    const failure = vi.spyOn(fs, 'writeFileSync').mockImplementation((file, ...args) => {
-      if (file === page || file === page + '.tmp') {
-        writeFile(file, 'Incomplete page', 'utf8')
-        throw new Error('Reference write interrupted')
-      }
-      return writeFile(file, ...args)
-    })
+      installSkillsForPlatform(tmp, platform)
+      const host = platform === 'opencode' ? '.opencode' : '.agents'
+      const page = path.join(tmp, host, 'skills/scaffold-runner/references/execution.md')
+      const expected = fs.readFileSync(page, 'utf8')
+      fs.writeFileSync(page, 'Local execution policy')
+      const writeFile = fs.writeFileSync.bind(fs)
+      const failure = vi.spyOn(fs, 'writeFileSync').mockImplementation((file, ...args) => {
+        if (file === page || file === page + '.tmp') {
+          writeFile(file, 'Incomplete page', 'utf8')
+          throw new Error('Reference write interrupted')
+        }
+        return writeFile(file, ...args)
+      })
 
-    expect(installSkillsForPlatform(tmp, platform, { force: true }).errors).toHaveLength(1)
-    expect(fs.readFileSync(page, 'utf8')).toBe('Local execution policy')
-    failure.mockRestore()
-    fs.unlinkSync(page)
-    expect(installSkillsForPlatform(tmp, platform).errors).toEqual([])
-    expect(fs.readFileSync(page, 'utf8')).toBe(expected)
-  })
+      expect(installSkillsForPlatform(tmp, platform, { force: true }).errors).toHaveLength(1)
+      expect(fs.readFileSync(page, 'utf8')).toBe('Local execution policy')
+      failure.mockRestore()
+      fs.unlinkSync(page)
+      expect(installSkillsForPlatform(tmp, platform).errors).toEqual([])
+      expect(fs.readFileSync(page, 'utf8')).toBe(expected)
+    })
 
   it.each(['codex', 'antigravity', 'cursor', 'opencode'] as const)('%s bundles linked skill pages', (platform) => {
     const result = installSkillsForPlatform(tmp, platform)
