@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -35,6 +35,7 @@ describe('installSkillsForPlatform', () => {
     tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'scaffold-skill-'))
   })
   afterEach(() => {
+    vi.restoreAllMocks()
     fs.rmSync(tmp, { recursive: true, force: true })
   })
 
@@ -68,6 +69,30 @@ describe('installSkillsForPlatform', () => {
     const skillPath = path.join(tmp, '.opencode', 'skills', 'scaffold-runner', 'SKILL.md')
     expect(fs.existsSync(skillPath)).toBe(true)
     expect(fs.readFileSync(skillPath, 'utf8')).toMatch(/^---\nname: scaffold-runner\n/)
+  })
+
+  it.each(['codex', 'antigravity', 'cursor', 'opencode'] as const)(
+    '%s preserves a reference after partial write failure', (platform) => {
+    installSkillsForPlatform(tmp, platform)
+    const host = platform === 'opencode' ? '.opencode' : '.agents'
+    const page = path.join(tmp, host, 'skills/scaffold-runner/references/execution.md')
+    const expected = fs.readFileSync(page, 'utf8')
+    fs.writeFileSync(page, 'Local execution policy')
+    const writeFile = fs.writeFileSync.bind(fs)
+    const failure = vi.spyOn(fs, 'writeFileSync').mockImplementation((file, ...args) => {
+      if (file === page || file === page + '.tmp') {
+        writeFile(file, 'Incomplete page', 'utf8')
+        throw new Error('Reference write interrupted')
+      }
+      return writeFile(file, ...args)
+    })
+
+    expect(installSkillsForPlatform(tmp, platform, { force: true }).errors).toHaveLength(1)
+    expect(fs.readFileSync(page, 'utf8')).toBe('Local execution policy')
+    failure.mockRestore()
+    fs.unlinkSync(page)
+    expect(installSkillsForPlatform(tmp, platform).errors).toEqual([])
+    expect(fs.readFileSync(page, 'utf8')).toBe(expected)
   })
 
   it.each(['codex', 'antigravity', 'cursor', 'opencode'] as const)('%s bundles linked skill pages', (platform) => {

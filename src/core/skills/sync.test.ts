@@ -5,7 +5,8 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 
 // Mock getPackageRoot so we can control where source skills are found
-vi.mock('../../utils/fs.js', () => ({
+vi.mock('../../utils/fs.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../utils/fs.js')>(),
   getPackageRoot: vi.fn(() => '/mock-package-root'),
 }))
 
@@ -250,7 +251,10 @@ describe('installAllSkills', () => {
     fs.writeFileSync(marker, 'previous version')
     const writeFile = fs.writeFileSync.bind(fs)
     const failure = vi.spyOn(fs, 'writeFileSync').mockImplementation((file, ...args) => {
-      if (file === page) throw new Error('Reference write interrupted')
+      if (file === page || file === page + '.tmp') {
+        writeFile(file, 'Incomplete page', 'utf8')
+        throw new Error('Reference write interrupted')
+      }
       return writeFile(file, ...args)
     })
 
@@ -258,6 +262,7 @@ describe('installAllSkills', () => {
 
     expect(result.errors).toHaveLength(1)
     expect(fs.existsSync(marker)).toBe(false)
+    expect(fs.existsSync(page)).toBe(false)
     failure.mockRestore()
     syncSkillsIfNeeded(tmpDir)
     expect(fs.readFileSync(page, 'utf8')).toBe('Read AGENTS.md.')

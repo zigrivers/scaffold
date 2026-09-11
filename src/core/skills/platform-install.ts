@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { atomicWriteFile } from '../../utils/fs.js'
 import { getSkillTemplateDir, getSkillReferenceFiles, INSTALLABLE_SKILLS, resolveSkillTemplate } from './sync.js'
 
 // All non-Claude hosts use AGENTS.md as their standing-instructions file, so the
@@ -87,7 +88,7 @@ export function installSkillsForPlatform(
       }
     }
     fs.mkdirSync(path.dirname(target), { recursive: true })
-    fs.writeFileSync(target, body)
+    atomicWriteFile(target, body)
     installed.push(rel)
   }
 

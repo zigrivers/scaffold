@@ -277,7 +277,7 @@ export async function runBuild(argv: BuildArgs, options: RunBuildOptions = {}): 
             const template = fs.readFileSync(path.join(skillTemplateDir, skillName, file), 'utf8')
             const destination = path.join(skillOutputDir, skillName, file)
             fs.mkdirSync(path.dirname(destination), { recursive: true })
-            fs.writeFileSync(destination, resolveSkillTemplate(template, claudeVars), 'utf8')
+            atomicWriteFile(destination, resolveSkillTemplate(template, claudeVars))
           }
         }
       }

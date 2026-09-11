@@ -272,6 +272,8 @@ describe('build command', () => {
   it('bundles resolved reference pages for plugin skill discovery', async () => {
     vi.mocked(fs.existsSync).mockRestore()
     vi.mocked(fs.mkdirSync).mockRestore()
+    const realFiles = await vi.importActual<typeof import('../../utils/fs.js')>('../../utils/fs.js')
+    mockAtomicWriteFile.mockImplementation(realFiles.atomicWriteFile)
     const packageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'scaffold-plugin-skills-'))
     vi.mocked(getPackageRoot).mockReturnValue(packageRoot)
     mockFindProjectRoot.mockReturnValue(packageRoot)
@@ -284,7 +286,22 @@ describe('build command', () => {
       expect(process.exitCode).toBe(0)
       const reference = path.join(packageRoot, 'skills/example/references/run.md')
       expect(fs.readFileSync(reference, 'utf8')).toBe('Read CLAUDE.md.')
+      const writeFile = fs.writeFileSync.bind(fs)
+      const failure = vi.spyOn(fs, 'writeFileSync').mockImplementation((file, ...args) => {
+        if (file === reference || file === reference + '.tmp') {
+          writeFile(file, 'Incomplete page', 'utf8')
+          throw new Error('Reference write interrupted')
+        }
+        return writeFile(file, ...args)
+      })
+      const args = { 'validate-only': false, force: false } as Parameters<typeof buildCommand.handler>[0]
+      await expect(buildCommand.handler(args)).rejects.toThrow('Reference write interrupted')
+      expect(fs.readFileSync(reference, 'utf8')).toBe('Read CLAUDE.md.')
+      failure.mockRestore()
+      await buildCommand.handler(args)
+      expect(fs.readFileSync(reference, 'utf8')).toBe('Read CLAUDE.md.')
     } finally {
+      mockAtomicWriteFile.mockReset()
       fs.rmSync(packageRoot, { recursive: true, force: true })
       vi.mocked(getPackageRoot).mockReturnValue('/fake')
     }

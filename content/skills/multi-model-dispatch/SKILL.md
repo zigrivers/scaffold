@@ -184,8 +184,10 @@ whole document when the affected scope requires it.]
 ## Additional Context
 [provide repository paths for relevant supporting context that reviewers can
 read on demand. If a reviewer cannot access the repository, bundle the needed
-excerpts instead; do not rely on inaccessible paths. Identify any unresolved
-context gap so the reviewer can request it before drawing a conclusion.]
+excerpts instead; do not rely on inaccessible paths. Report unresolved
+context gaps in the JSON summary without approving work that depends on missing
+evidence. The dispatching agent supplies that context before relying on the review;
+headless reviewers do not pause for an interactive response.]
 
 ## PR Diff
 [paste output of gh pr diff <number> or git diff origin/main...HEAD]

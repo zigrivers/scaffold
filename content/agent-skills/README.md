@@ -41,4 +41,6 @@ Codex, Antigravity, and Cursor native installs also place the full skill and its
 references in `.agents/skills/<name>/`; their lean rules point there. OpenCode
 uses `.opencode/skills/<name>/`. Existing dedicated skill/reference files are
 preserved unless `--force` is requested. Review local customizations before a
-forced upgrade; automatic sync does not replace existing skill bundles.
+forced upgrade. Automatic sync preserves existing files and restores missing
+files when retrying a stale or interrupted bundle. Native OpenCode bundles are
+repaired by rerunning their explicit `skill install --platform opencode` command.

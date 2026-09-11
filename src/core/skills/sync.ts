@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { getPackageRoot } from '../../utils/fs.js'
+import { atomicWriteFile, getPackageRoot } from '../../utils/fs.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -150,7 +150,7 @@ export function installAllSkills(projectRoot: string, options?: InstallOptions):
           const template = fs.readFileSync(path.join(templateDir, skill.name, file), 'utf8')
           const resolved = resolveSkillTemplate(template, target.templateVars)
           fs.mkdirSync(path.dirname(destination), { recursive: true })
-          fs.writeFileSync(destination, resolved, 'utf8')
+          atomicWriteFile(destination, resolved)
           wroteFile = true
         }
         if (wroteFile) installed++
